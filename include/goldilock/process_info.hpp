@@ -4,16 +4,21 @@
 
 #include <stdint.h>
 
+#ifdef _WIN32
+#include <windows.h>
+using pid_t = DWORD;
+#endif
+
 namespace tipi::goldilock::process_info {
 
   #ifdef _WIN32
-  #include <windows.h>
+  
   #include <tlhelp32.h>
   #include <process.h>
-
+  
   inline pid_t get_parent_pid()
   {
-    HANDLE hSnapshot = INVALUD_HANDLE_VALUE;
+    HANDLE hSnapshot = INVALID_HANDLE_VALUE;
     PROCESSENTRY32 pe32;
     DWORD ppid = 0, pid = GetCurrentProcessId();
 
