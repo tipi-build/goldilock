@@ -14,7 +14,7 @@ The PID written to the lock file is the PID of the parent process of `goldilock`
 Building
 --------
 
-Build using `tipi` 
+Build using `tipi` (substitute the toolchain your platform of choice e.g. `windows-cxx17` or `vs-16-2019-win64-cxx17` etc...)
 
 ```shell
 tipi . -t linux-cxx17
@@ -26,8 +26,9 @@ tipi . -t linux-cxx17
 mkdir cmake_build
 cd cmake_build
 cmake ..
-make
+cmake --build .
 ```
+
 
 License
 -------
