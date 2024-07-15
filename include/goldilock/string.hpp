@@ -26,4 +26,20 @@ namespace tipi::goldilock::string {
     return (value.size() > ending.size()) 
       && std::equal(ending.rbegin(), ending.rend(), value.rbegin(), ichar_equals);
   }
+
+  const char* ws = " \t\n\r\f\v";
+
+  inline std::string& rtrim(std::string& s, const char* t = ws) {
+      s.erase(s.find_last_not_of(t) + 1);
+      return s;
+  }
+
+  inline std::string& ltrim(std::string& s, const char* t = ws) {
+      s.erase(0, s.find_first_not_of(t));
+      return s;
+  }
+
+  inline std::string& trim(std::string& s, const char* t = ws) {
+      return ltrim(rtrim(s, t), t);
+  }
 }

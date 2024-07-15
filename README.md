@@ -6,7 +6,7 @@ The PID written to the lock file is the PID of the parent process of `goldilock`
 
 - a lock is acquired by `goldilock <path to lockfile> --acquire`
     - `goldilock` returns as soon as the lock could be acquired and spin waits otherwise.
-- a lock can be released manually by `goldilock <path to lockfile> --release` (but only by the parent process that aquired the lock initially)
+- a lock can be released manually by `goldilock <path to lockfile> --release` (but only by the if executed in the as a child of the same matched parent process)
 - a lock is considered expired when the PID that acquired the lock is no longer a running process
 - `goldilock` can search in the parent process acquiring the lock by name (using `goldilock ... -s process_name1,process_name2` argument). The furthest matching parent is used unless `--nearest` is enabled
 - `goldilock` is reentrant by parent process id (e.g. one same parent process can pass the barrier many times as long as it holds the lock)

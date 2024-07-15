@@ -106,10 +106,8 @@ namespace tipi::goldilock::process_info {
 
     // https://man7.org/linux/man-pages/man5/proc.5.html
     // definition of /proc/<pid>/stat from fs/proc/array.c.
-    //
-    namespace fs = boost::filesystem;
 
-    for (fs::directory_entry &entry : fs::directory_iterator{"/proc"}) {
+    for (auto& entry : std::filesystem::directory_iterator{"/proc"}) {
 
       auto dirname = entry.path().filename().generic_string();
 
@@ -134,17 +132,11 @@ namespace tipi::goldilock::process_info {
               pi.pid = std::atoi(token.data());
               break;
             case 1:
-              if(token[0] == '(') {
-                token.erase(0, 1);
-              }
-
-              if(token[token.size()] == ')') {
-                token.erase(token.size() - 1);
-              }
+              goldilock::string::trim(token, "()");
               pi.name = token;
               break;
             case 3:
-              pi.ppid = std::atoi(token.data());
+              pi.parent_pid = std::atoi(token.data());
               break;
             case 5:
               success = true;
@@ -159,7 +151,7 @@ namespace tipi::goldilock::process_info {
         }
 
         if(success) {
-          processId_v_parentPid[pid] = ppid;
+          result[pi.pid] = pi;
         }        
       }
 
@@ -238,9 +230,7 @@ namespace tipi::goldilock::process_info {
 
   #endif
 
-
-  //!\brief search for the farthest away parent process with any one of the provided process names (case insensitive search)
-  inline std::optional<pid_t> get_parent_pid_by_name(const std::vector<std::string>& process_names, bool search_nearest) {
+  inline std::vector<proc_info> get_parent_processes() {
     auto proc_map = get_process_map();
 
     auto get_parent_procinfo = [&proc_map](pid_t parent_pid) -> std::optional<proc_info> {      
@@ -268,6 +258,15 @@ namespace tipi::goldilock::process_info {
       }
     }
 
+    return proc_stack;
+  }
+
+
+  //!\brief search for the farthest away parent process with any one of the provided process names (case insensitive search)
+  inline std::optional<pid_t> get_parent_pid_by_name(const std::vector<std::string>& process_names, bool search_nearest) {
+    
+    auto proc_stack = get_parent_processes();
+
     std::optional<pid_t> match = std::nullopt;
 
     for(const auto& pi : proc_stack) {
@@ -284,6 +283,18 @@ namespace tipi::goldilock::process_info {
     }
 
     return match;
+  }
+
+  inline bool is_pid_a_parent_process(pid_t needle) {
+    auto proc_stack = get_parent_processes();
+
+    auto it = std::find_if(
+      proc_stack.begin(), 
+      proc_stack.end(), 
+      [&](const proc_info& entry) { return entry.pid == needle; }
+    );
+
+    return it != proc_stack.end();
   }
 
 
