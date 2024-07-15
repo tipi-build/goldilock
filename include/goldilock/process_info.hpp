@@ -94,7 +94,7 @@ namespace tipi::goldilock::process_info {
         int st = proc_pidinfo(pids[i], PROC_PIDT_SHORTBSDINFO, 0, &proc_info_short, PROC_PIDT_SHORTBSDINFO_SIZE);
 
         if (st == PROC_PIDT_SHORTBSDINFO_SIZE) {
-            luc::proc_info pi{};
+            proc_info pi{};
             pi.pid = proc_info_short.pbsi_pid;
             pi.parent_pid = proc_info_short.pbsi_ppid;
             pi.name = std::string(proc_info_short.pbsi_comm);

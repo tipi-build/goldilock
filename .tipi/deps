@@ -1,5 +1,12 @@
 {
     "jarro2783/cxxopts": {
-        "@": "v3.2.0"
+        "@": "v3.2.0", 
+        "u":true, 
+        "packages": [
+            "cxxopts"
+        ],
+        "targets": [
+            "cxxopts::cxxopts"
+        ]
     }
 }
