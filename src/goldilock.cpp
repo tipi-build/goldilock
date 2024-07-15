@@ -161,8 +161,8 @@ namespace tipi::goldilock
 
         // delete the lock file if the parent process isn't running and try to race again
         if(!process_info::is_process_running(original_locker_parent_pid)) {
-          log << "Removing expired lock file" << std::endl;
           std::filesystem::remove(lockfile_path);
+          log << "Removed expired lock file" << std::endl;
         }
 
         log << "Previous parent process still running - waiting" << std::endl;
@@ -198,18 +198,23 @@ namespace tipi::goldilock
       }    
       
       try {
-        log << "Reading exising lock file" << std::endl;
-
-        auto lockfile_content = file::read_file_content(lockfile_path);
-        pid_t original_locker_parent_pid = std::stoll(lockfile_content);
-
-        if(original_locker_parent_pid == ppid) {
-          log << "Freeing lock" << std::endl;
-          std::filesystem::remove(lockfile_path);    
-          released_goldilock = true;    
+        if(!std::filesystem::exists(lockfile_path)) {
+          log << "Could not find lock file '" << lockfile_path << "' - skipping" << std::endl;
         }
-        else {
-          log << "Parent process ID not matching - skipping" << std::endl;
+        else {        
+          log << "Reading exising lock file '" << lockfile_path << "'" << std::endl;
+
+          auto lockfile_content = file::read_file_content(lockfile_path);
+          pid_t original_locker_parent_pid = std::stoll(lockfile_content);
+
+          if(original_locker_parent_pid == ppid || (cli_result.count("search_parent") == 0 && goldilock::process_info::is_pid_a_parent_process(original_locker_parent_pid))) {
+            std::filesystem::remove(lockfile_path);
+            log << "Released lock" << std::endl;
+            released_goldilock = true;    
+          }
+          else {
+            log << "Parent process ID not matching - skipping" << std::endl;
+          }
         }
       }
       catch(...) { /* oh well */ }
