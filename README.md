@@ -13,8 +13,7 @@ The PID written to the lock file is the PID of the parent process of `goldilock`
 - the order of locking depends on the OS scheduler
 
 ```help
-> goldilock --help                 
-You must specify the [lockfile] positional argument
+> goldilock --help
 goldilock - parent process id based concurrency barrier
 Usage:
   goldilock [OPTION...] positional parameters
