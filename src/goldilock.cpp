@@ -8,16 +8,14 @@
 #include <thread>
 #include <chrono>
 
+#include <cxxopts.hpp>
 #include <goldilock/file.hpp>
 #include <goldilock/fstream.hpp>
 #include <goldilock/process_info.hpp>
+#include <goldilock/string.hpp>
 
 namespace tipi::goldilock
 {  
-  void show_help(const char *arg0) {
-    std::cout << "Unexpected command line argmuments count.\nUsage: " << arg0 << " <path to lock file> [acquire|release]" << std::endl;
-  }
-
   std::string getenv_or_default(const char* var_name, const std::string& default_value = "") {
     auto val = std::getenv(var_name);
 
@@ -28,38 +26,102 @@ namespace tipi::goldilock
     return default_value;
   }
 
-  bool is_verbose() {
-    auto val = getenv_or_default("VERBOSE", "0");
-    return val != "0" && val != "false" && val != "FALSE";
-  }
-
   inline std::ostream nowhere_sink(0);
-  const std::string LOCK_ACTION_ACQUIRE = "acquire";
-  const std::string LOCK_ACTION_RELEASE = "release";
 
   inline int goldilock_main(int argc, char **argv) {
-    auto &log = (is_verbose()) ? std::cout : nowhere_sink;
-
     using namespace tipi::goldilock;
     using namespace std::chrono_literals;
 
-    std::vector<std::string> cli_args{argv + 1, argv + argc};
+    cxxopts::Options options("goldilock", "goldilock - parent process id based concurrency barrier");
+    options.add_options()
+      ("v,verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
+      ("h,help", "Print usage")
+      ("lockfile", "Lockfile to acquire / release", cxxopts::value<std::string>())
+      ("acquire", "Try to acquire the lock", cxxopts::value<bool>())
+      ("release", "Try to release the lock", cxxopts::value<bool>())
+      ("s,search_parent", "Search locking parent process by name (comma separate list e.g. name1,name2,name3). If unspecified immediate parent process of goldilock is used. By default the farthest parent process matching the search term is selected.", cxxopts::value<std::vector<std::string>>()) 
+      ("n,nearest", "If -s is enabled, search for the nearest parent matching the search")
+    ;
 
-    if (cli_args.size() != 2) {
-      show_help(argv[0]);
+    options.parse_positional({"lockfile"});
+
+    cxxopts::ParseResult cli_result;
+
+    try {
+      cli_result = options.parse(argc, argv);
+    }
+    catch (const std::exception &exc)
+    {
+      std::cerr << exc.what() << std::endl;
+      std::cout << options.help() << std::endl;
+      return 1;
+    }
+    catch(...) {
+      std::cerr << "Unhandled exception while parsing command line options" << std::endl;
+      std::cout << options.help() << std::endl;
       return 1;
     }
 
-    std::string lockfile_path = cli_args[0];
-    std::string goldilock_action = cli_args[1];
+    std::string cli_err = "";
+    bool valid_cli = true;
 
-    if(goldilock_action != LOCK_ACTION_ACQUIRE && goldilock_action != LOCK_ACTION_RELEASE) {
-      show_help(argv[0]);
+    if(cli_result.count("acquire") + cli_result.count("release") == 0) {
+      cli_err = "You must --acquire or --release";
+      valid_cli = false;
+    }
+
+    if(cli_result.count("acquire") + cli_result.count("release") > 1) {
+      cli_err = "You cannot --acquire and --release simultaneously";
+      valid_cli = false;
+    }
+
+    if(cli_result.count("lockfile") == 0) {
+      cli_err = "You must specify the [lockfile] positional argument";
+      valid_cli = false;
+    }
+
+    if(!valid_cli) {
+      std::cerr << cli_err << std::endl;
+      std::cout << options.help() << std::endl;
       return 1;
     }
+
+    if (cli_result.count("help")) {
+      std::cout << options.help() << std::endl;
+      return 0;
+    }
+
+    auto &log = (cli_result.count("verbose")) ? std::cout : nowhere_sink;
+
+    //
+    auto lockfile_path = cli_result["lockfile"].as<std::string>();    
+
+    // get the process id of the locking parent process
+    std::function<std::optional<pid_t>(void)> get_locking_parent_process_id = [&]() -> std::optional<pid_t> {
+      if(cli_result.count("search_parent")) {
+        bool search_nearest = cli_result.count("nearest") > 0;
+        return process_info::get_parent_pid_by_name(cli_result["search_parent"].as<std::vector<std::string>>(), search_nearest);
+      }
+      else {
+        return process_info::get_parent_pid();
+      }
+    };
 
     // get our parent process id:
-    auto ppid = process_info::get_parent_pid();
+    auto locking_parent_process_id = get_locking_parent_process_id();
+
+    if(!locking_parent_process_id) {
+      std::cout << "No parent process with any of the following names was found: ";
+
+      for(const auto& n : cli_result["search_parent"].as<std::vector<std::string>>()) {
+        std::cout << "'" << n << "' ";
+      }
+
+      std::cout << std::endl;
+      return 1;
+    }
+
+    auto ppid = locking_parent_process_id.value();
 
     auto get_lock = [&log](std::string lock_path, pid_t pid) -> bool {
       log << "Trying to acquire exclusive write access to " << lock_path  << std::endl;     
@@ -137,6 +199,7 @@ namespace tipi::goldilock
       
       try {
         log << "Reading exising lock file" << std::endl;
+
         auto lockfile_content = file::read_file_content(lockfile_path);
         pid_t original_locker_parent_pid = std::stoll(lockfile_content);
 
@@ -156,7 +219,7 @@ namespace tipi::goldilock
     };
 
 
-    if(goldilock_action == LOCK_ACTION_ACQUIRE) {
+    if(cli_result.count("acquire")) {
       bool got_lock = acquire_lock();  
       while(!got_lock) {
         std::this_thread::sleep_for(50ms);

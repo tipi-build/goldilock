@@ -13,6 +13,17 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+
+include(FetchContent)
+
+FetchContent_Declare(
+  cxxopts
+  GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
+  GIT_TAG        3bf268481da8208d171d8908e6491459de3651d7 # tag v3.2.0
+)
+
+FetchContent_MakeAvailable(cxxopts)
+
 find_package(Threads)
 
 add_library(libgoldilock-utils INTERFACE )
