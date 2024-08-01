@@ -23,7 +23,7 @@ using pid_t = DWORD;
 #elif __APPLE__
 #include <libproc.h>
 #else
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <streambuf>
 #endif
@@ -107,7 +107,7 @@ namespace tipi::goldilock::process_info {
     // https://man7.org/linux/man-pages/man5/proc.5.html
     // definition of /proc/<pid>/stat from fs/proc/array.c.
 
-    for (auto& entry : std::filesystem::directory_iterator{"/proc"}) {
+    for (auto& entry : boost::filesystem::directory_iterator{"/proc"}) {
 
       auto dirname = entry.path().filename().generic_string();
 
