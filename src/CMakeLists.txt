@@ -4,5 +4,5 @@
 # goldilock
 add_executable(goldilock "${CMAKE_CURRENT_LIST_DIR}/goldilock.cpp" )
 set_target_properties(goldilock PROPERTIES OUTPUT_NAME goldilock)
-target_link_libraries(goldilock libgoldilock-utils cxxopts::cxxopts)
+target_link_libraries(goldilock libgoldilock-utils cxxopts::cxxopts Boost::system Boost::filesystem)
 install(TARGETS goldilock RUNTIME DESTINATION bin)

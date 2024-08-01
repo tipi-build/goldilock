@@ -7,7 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <filesystem>
+#include <boost/filesystem.hpp>
 
 namespace tipi::goldilock::file {
 
@@ -28,7 +28,7 @@ namespace tipi::goldilock::file {
     return read_file_content(filename.data());
   }
 
-  inline std::string read_file_content(const std::filesystem::path& filename) {
+  inline std::string read_file_content(const boost::filesystem::path& filename) {
     return read_file_content(filename.generic_string());
   }
 

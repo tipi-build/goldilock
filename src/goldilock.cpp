@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-only OR Proprietary
 
 #include <iostream>
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <string>
 #include <vector>
 #include <thread>
@@ -161,7 +161,7 @@ namespace tipi::goldilock
 
         // delete the lock file if the parent process isn't running and try to race again
         if(!process_info::is_process_running(original_locker_parent_pid)) {
-          std::filesystem::remove(lockfile_path);
+          boost::filesystem::remove(lockfile_path);
           log << "Removed expired lock file" << std::endl;
         }
 
@@ -188,7 +188,7 @@ namespace tipi::goldilock
 
           if(!process_info::is_process_running(original_locker_parent_pid)) {
             log << "Removing expired lock file" << std::endl;
-            std::filesystem::remove(release_lock);
+            boost::filesystem::remove(release_lock);
           }
           else {
             log << "Process active waiting for exit / pid = " << original_locker_parent_pid << std::endl;
@@ -198,7 +198,7 @@ namespace tipi::goldilock
       }    
       
       try {
-        if(!std::filesystem::exists(lockfile_path)) {
+        if(!boost::filesystem::exists(lockfile_path)) {
           log << "Could not find lock file '" << lockfile_path << "' - skipping" << std::endl;
         }
         else {        
@@ -208,7 +208,7 @@ namespace tipi::goldilock
           pid_t original_locker_parent_pid = std::stoll(lockfile_content);
 
           if(original_locker_parent_pid == ppid || (cli_result.count("search_parent") == 0 && goldilock::process_info::is_pid_a_parent_process(original_locker_parent_pid))) {
-            std::filesystem::remove(lockfile_path);
+            boost::filesystem::remove(lockfile_path);
             log << "Released lock" << std::endl;
             released_goldilock = true;    
           }
@@ -219,7 +219,7 @@ namespace tipi::goldilock
       }
       catch(...) { /* oh well */ }
 
-      std::filesystem::remove(release_lock);
+      boost::filesystem::remove(release_lock);
       return released_goldilock;
     };
 

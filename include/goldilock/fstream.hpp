@@ -10,7 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <filesystem>
+#include <boost/filesystem.hpp>
 
 namespace tipi::goldilock::exclusive_fstream
 {
@@ -44,7 +44,7 @@ namespace tipi::goldilock::exclusive_fstream
     return open(filename.data());
   }
 
-  inline std::fstream open(const std::filesystem::path& filename) {
+  inline std::fstream open(const boost::filesystem::path& filename) {
     return open(filename.generic_string());
   }
 }
