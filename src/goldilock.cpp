@@ -321,15 +321,14 @@ namespace tipi::goldilock
 
   #if BOOST_OS_WINDOWS
   struct new_window_handler : ::boost::process::detail::handler_base
-  {
-    
+  {    
     // this function will be invoked at child process constructor before spawning process
     template <class Executor>
     void on_setup(Executor &e) const
     {
       // tell windows to create a new console, which is the best equivalent of running a detached process
       e.creation_flags = boost::winapi::CREATE_NEW_CONSOLE_;
-      
+    }      
   };
   #endif
 
@@ -343,6 +342,7 @@ namespace tipi::goldilock
       ("timeout", "In the case of --unlockfile, specify a timeout that should not be exceeded (in seconds, default to 60)", cxxopts::value<size_t>()->default_value("60"))
       ("no-timeout", "Do not timeout when using --unlockfile")
       ("detach", "Launch a detached copy with the same parameters otherwise")
+      ("lock-success-marker", "A marker file to write when all logs got acquired", cxxopts::value<std::vector<std::string>>())
       ("version", "Print the version of goldilock")
     ;
 
@@ -398,6 +398,17 @@ namespace tipi::goldilock
       return ((valid_cli) ? 0 : 1);
     }
 
+    std::vector<std::string> success_markers{};
+    if(cli_result.count("lock-success-marker") > 0) {
+      success_markers = cli_result["lock-success-marker"].as<std::vector<std::string>>();
+
+      for(const auto& marker : success_markers) {
+        if(fs::exists(marker)) {
+          fs::remove(marker);
+        }
+      }
+    }
+
     fs::path shell;
     std::string shell_arg1;
     #if BOOST_OS_WINDOWS
@@ -410,11 +421,16 @@ namespace tipi::goldilock
 
     if (cli_result.count("detach")) {
       std::stringstream cmd_ss;
-
       std::vector<std::string> all_argv(argv, argv + argc);
 
+      auto temp_file = boost::filesystem::unique_path(); // this is our success marker
+      fs::remove(temp_file); // make sure it's gone
+
       for(const auto& arg : all_argv) {
-        if(arg != "--detach") {
+        if(arg == "--detach") {
+          cmd_ss << " --lock-success-marker " << temp_file.generic_string();
+        }
+        else {
           cmd_ss << " " << arg;
         }
       }
@@ -424,8 +440,28 @@ namespace tipi::goldilock
         , new_window_handler()
         #endif
       };
-      child_process.detach();
-      return 0;
+
+      // wait for the child to die or the marker to show up:
+      std::optional<size_t> child_ret;
+      bool marker_appeared = false;
+
+      while(!marker_appeared && !child_ret.has_value()) {
+        std::this_thread::sleep_for(100ms);
+
+        marker_appeared = fs::exists(temp_file);
+
+        if(!child_process.running()) {
+          child_ret = child_process.exit_code();
+        }        
+      }
+
+      if(child_process.running() && marker_appeared) {
+        child_process.detach();
+        return 0;
+      }
+      else {
+        return child_ret.value_or(1); // only success if the child ret'ed 0
+      }      
     }
 
     auto &log = (cli_result.count("verbose")) ? std::cout : nowhere_sink;
@@ -526,6 +562,12 @@ namespace tipi::goldilock
       io.stop();
       io_thread.join();
       return 1;
+    }
+
+    // write all the success markers
+    for(const auto& marker : success_markers) {
+      std::fstream ofs(marker, std::ios::out | std::ios::trunc | std::ios::in | std::ios::binary);
+      ofs.close();
     }
 
     bool watched_process_is_running = true;

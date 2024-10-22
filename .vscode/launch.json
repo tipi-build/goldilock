@@ -8,8 +8,7 @@
         "type": "cppvsdbg",
         "request": "launch",
         "program": "./src/Debug/goldilock.exe",
-        "args": ["-l", "sock1.sock", "-l", "lock2" , "-v", "--unlockfile", "file1"
-        //, "--detach"
+        "args": ["-l", "sock1.sock", "-l", "lock55" , "-v", "--unlockfile", "file1", "--detach"
         ],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}/cmake_build",

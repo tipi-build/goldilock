@@ -1,36 +1,45 @@
 Goldilock - parent process id based concurrency barrier
 =======================================================
 
-`goldilock` is a PID lock-file based mutex that can be used to manage access to shared ressources by blocking access until an exclusive lock can be aquired.
-The PID written to the lock file is the PID of the parent process of `goldilock`.
+`goldilock` is a lock-file based mutex that can be used to manage access to shared ressources by blocking access until an exclusive lock can be aquired.
 
-- a lock is acquired by `goldilock <path to lockfile> --acquire`
-    - `goldilock` returns as soon as the lock could be acquired and spin waits otherwise.
-- a lock can be released manually by `goldilock <path to lockfile> --release` (but only by the if executed in the as a child of the same matched parent process)
-- a lock is considered expired when the PID that acquired the lock is no longer a running process
-- `goldilock` can search in the parent process acquiring the lock by name (using `goldilock ... -s process_name1,process_name2` argument). The furthest matching parent is used unless `--nearest` is enabled
-- `goldilock` is reentrant by parent process id (e.g. one same parent process can pass the barrier many times as long as it holds the lock)
-- the order of locking depends on the OS scheduler
+- `goldilock` can acquire multiple locks in the same command
+- `goldilock` avoids deadlocking by:
+    - reshuffling the position in queue when wait times exceed some threshold
+    - automatically expires wait queue positions when the owner process (read "another `goldilock`) doesn't refresh it regularly
+- `goldilock` can launch a process once it aquired (all) lock(s)
+- `--detach` to handle the locking in a background process
+- `--unlockfile <path>` as an alternative to launching a process to support file based IPC in the case of `--detach` -ed workflows
+- `--timeout` possible when using `--unlockfile` (defaults to 60s)
+
 
 ```help
 > goldilock --help                 
 You must specify the [lockfile] positional argument
-goldilock - parent process id based concurrency barrier
+goldilock - flexible file based locking and process barrier for the win
 Usage:
-  goldilock [OPTION...] positional parameters
+  goldilock [OPTIONS] -- <command(s)...>    any command line command that
+                                            goldilock should run once the 
+                                            locks are acquired. After 
+                                            command returns, the locks are
+                                            released and the return code
+                                            forwarded. Standard I/O is 
+                                            forwarded unchanged
 
-  -v, --verbose            Verbose output
-  -h, --help               Print usage
-      --acquire            Try to acquire the lock
-      --release            Try to release the lock
-  -s, --search_parent arg  Search locking parent process by name (comma
-                           separate list e.g. name1,name2,name3). If
-                           unspecified immediate parent process of
-                           goldilock is used. By default the farthest
-                           parent process matching the search term is
-                           selected.
-  -n, --nearest            If -s is enabled, search for the nearest parent
-                           matching the search
+  -v, --verbose         Verbose output
+  -h, --help            Print usage
+  -l, --lockfile arg    Lockfile(s) to acquire / release, specify as many
+                        as you want
+      --unlockfile arg  Instead of running a command, have goldilock wait
+                        for all the specified unlock files to exist (those
+                        files will be deleted on exit)
+      --timeout arg     In the case of --unlockfile, specify a timeout that
+                        should not be exceeded (in seconds, default to 60)
+                        (default: 60)
+      --no-timeout      Do not timeout when using --unlockfile
+      --detach          Launch a detached copy with the same parameters
+                        otherwise
+      --version         Print the version of goldilock
 ```
 
 Building
