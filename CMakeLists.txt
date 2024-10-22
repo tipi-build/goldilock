@@ -35,7 +35,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(boost)
 
-
 find_package(Threads)
 
 add_library(libgoldilock-utils INTERFACE )

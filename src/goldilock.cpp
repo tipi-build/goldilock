@@ -30,6 +30,7 @@
 #include <goldilock/fstream.hpp>
 #include <goldilock/process_info.hpp>
 #include <goldilock/string.hpp>
+#include <goldilock/version.hpp> // generated
 
 #if BOOST_OS_WINDOWS
 #include <boost/winapi/process.hpp>
@@ -332,7 +333,7 @@ namespace tipi::goldilock
   };
 
   inline int goldilock_main(int argc, char **argv) {
-    cxxopts::Options options("goldilock", "goldilock - parent process id based concurrency barrier");
+    cxxopts::Options options("goldilock", "goldilock - flexible file based locking and process barrier for the win");
     options.add_options()
       ("v,verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
       ("h,help", "Print usage")
@@ -341,10 +342,13 @@ namespace tipi::goldilock
       ("timeout", "In the case of --unlockfile, specify a timeout that should not be exceeded (in seconds, default to 60)", cxxopts::value<size_t>()->default_value("60"))
       ("no-timeout", "Do not timeout when using --unlockfile")
       ("detach", "Launch a detached copy with the same parameters otherwise")
+      ("version", "Print the version of goldilock")
     ;
 
     //options.parse_positional({"lockfile"});
     options.allow_unrecognised_options();
+    options.custom_help("[OPTIONS] -- <command(s)...> any command line command that goldilock should run once the locks are acquired. After command returns, the locks are released and the return code forwarded. Standard I/O is forwarded unchanged");
+    options.show_positional_help();
 
     cxxopts::ParseResult cli_result;
 
@@ -378,15 +382,19 @@ namespace tipi::goldilock
       valid_cli = false;
     }
 
-    if(!valid_cli) {
-      std::cerr << cli_err << std::endl;
-      std::cout << options.help() << std::endl;
-      return 1;
+    if (cli_result.count("version")) {
+      std::cout << "goldilock " << GOLDILOCK_VERSION << " (built from " << GOLDILOCK_GIT_REVISION << ")" << std::endl;
+      return 0;
     }
 
-    if (cli_result.count("help")) {
+    bool show_help = cli_result.count("help") > 0;
+
+    if (!valid_cli || show_help) {
+      if(!show_help) {
+        std::cerr << cli_err << std::endl;
+      }
       std::cout << options.help() << std::endl;
-      return 0;
+      return ((valid_cli) ? 0 : 1);
     }
 
     fs::path shell;
