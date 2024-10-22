@@ -577,8 +577,6 @@ namespace tipi::goldilock
 
       size_t update = 0;
 
-      try {
-
       while(watched_process_is_running && !exit_requested) {
 
         if(update % 20 == 0) { // 20x50ms = 1s
@@ -591,10 +589,6 @@ namespace tipi::goldilock
 
         update++;
         std::this_thread::sleep_for(50ms);
-      }
-      }
-      catch(...) {
-        std::cout << "Exxx" << std::endl;
       }
     });
 
