@@ -7,6 +7,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
 #include <boost/process.hpp>
+#include <boost/process/handles.hpp>
 #include <boost/scope_exit.hpp>
 #include <boost/asio.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -435,10 +436,14 @@ namespace tipi::goldilock
         }
       }
 
-      auto child_process = bp::child{shell, shell_arg1, cmd_ss.str()
+      auto child_process = bp::child{shell, shell_arg1, cmd_ss.str(),
         #if BOOST_OS_WINDOWS
-        , new_window_handler()
+        new_window_handler(),
         #endif
+        bp::std_out > bp::null, 
+        bp::std_err > bp::null,
+        bp::std_in < bp::null,
+        boost::process::limit_handles
       };
 
       // wait for the child to die or the marker to show up:
