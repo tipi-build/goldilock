@@ -1,12 +1,18 @@
 {
     "jarro2783/cxxopts": {
         "@": "v3.2.0", 
-        "u":true, 
+        "u": true, 
         "packages": [
             "cxxopts"
         ],
         "targets": [
             "cxxopts::cxxopts"
         ]
+    },
+    "boostorg/boost": {
+        "@": ":ab7968a0bbcf574a7859240d1d8443f58ed6f6cf",
+        "u": true,
+        "packages": [ "boost_system", "boost_filesystem", "boost_regex", "boost_lexical_cast", "boost_process", "boost_scope_exit", "boost_asio", "boost_uuid" ],
+        "targets": [ "Boost::system", "Boost::filesystem", "Boost::regex", "Boost::lexical_cast", "Boost::process", "Boost::scope_exit", "Boost::asio", "Boost::uuid" ]
     }
 }

@@ -19,10 +19,10 @@ namespace tipi::goldilock::exclusive_fstream
     void operator()(std::FILE *fp) const { std::fclose(fp); }
   };
 
-  inline std::fstream open(const char *filename)
+  inline std::fstream open(const char *filename, const std::string mode = "wx")
   {
-    bool excl = [filename] {
-      std::unique_ptr<std::FILE, FILE_closer> fp(std::fopen(filename, "wx"));
+    bool excl = [filename, mode] {
+      std::unique_ptr<std::FILE, FILE_closer> fp(std::fopen(filename, mode.data()));
       return !!fp;
     }();
     auto saveerr = errno;
@@ -40,11 +40,11 @@ namespace tipi::goldilock::exclusive_fstream
     return stream;
   }
 
-  inline std::fstream open(const std::string& filename) {
-    return open(filename.data());
+  inline std::fstream open(const std::string& filename, const std::string mode = "wx") {
+    return open(filename.data(), mode);
   }
 
-  inline std::fstream open(const boost::filesystem::path& filename) {
-    return open(filename.generic_string());
+  inline std::fstream open(const boost::filesystem::path& filename, const std::string mode = "wx") {
+    return open(filename.generic_string(), mode);
   }
 }
