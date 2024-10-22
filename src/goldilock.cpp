@@ -319,18 +319,19 @@ namespace tipi::goldilock
     return result;
   }
 
-
+  #if BOOST_OS_WINDOWS
   struct new_window_handler : ::boost::process::detail::handler_base
   {
-    #if BOOST_OS_WINDOWS
+    
     // this function will be invoked at child process constructor before spawning process
-    template <class WindowsExecutor>
-    void on_setup(WindowsExecutor &e) const
+    template <class Executor>
+    void on_setup(Executor &e) const
     {
+      // tell windows to create a new console, which is the best equivalent of running a detached process
       e.creation_flags = boost::winapi::CREATE_NEW_CONSOLE_;
-    }
-    #endif
+      
   };
+  #endif
 
   inline int goldilock_main(int argc, char **argv) {
     cxxopts::Options options("goldilock", "goldilock - flexible file based locking and process barrier for the win");
@@ -418,7 +419,11 @@ namespace tipi::goldilock
         }
       }
 
-      auto child_process = bp::child{shell, shell_arg1, cmd_ss.str(), new_window_handler()};
+      auto child_process = bp::child{shell, shell_arg1, cmd_ss.str()
+        #if BOOST_OS_WINDOWS
+        , new_window_handler()
+        #endif
+      };
       child_process.detach();
       return 0;
     }
@@ -502,7 +507,7 @@ namespace tipi::goldilock
 
       // if we didn't manage to aquire the locks 100 times in a row, let's get back line 
       // so we don't deadlock (especially in cases where someones else got a partial lock)
-      if(failed_all_locks_acquire > 10) {
+      if(failed_all_locks_acquire > 300) { // 300 * 100ms = 30s
         failed_all_locks_acquire = 0;
         for(auto& [target, spot] : spots) {
           spot.get_in_line();
