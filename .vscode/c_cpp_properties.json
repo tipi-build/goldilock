@@ -18,6 +18,22 @@
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64"
+        },
+        {
+            "name": "WSL",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/local/share/.tipi/vJ.w/97861a7-boost.b/a4d7881/installed",
+                "/usr/local/share/.tipi/vJ.w/740a77d-cxxopts.b/a4d7881/installed"
+            ],
+            "defines": [
+                "_DEBUG",
+                "LINUX"
+            ],
+            "compilerPath": "/usr/local/share/.tipi/clang/4f846ee/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64"
         }
     ],
     "version": 4

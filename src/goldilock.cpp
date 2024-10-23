@@ -284,7 +284,7 @@ namespace tipi::goldilock
     size_t timestamp_ = 0;
   };
 
-  //!\brief list all lockfiles given a lockfile path "waiting in line"
+  //!\brief list all lockfiles given a lockfile path "waiting in line" and clear expired ones
   inline std::map<fs::path, goldilock_spot> list_lockfile_spots(const fs::path& lockfile_path) {
     std::map<fs::path, goldilock_spot> result;
     fs::path parent_path = fs::weakly_canonical(fs::path(lockfile_path)).parent_path();     
@@ -300,19 +300,24 @@ namespace tipi::goldilock
       // this means it is a potentially valid lock file
       if(locker_in_line.has_value()) {
 
+        bool delete_spot = false;
+
         try {
           auto spot = goldilock_spot::read_from(directory_entry.path(), lockfile_path);
-          if(spot.is_expired()) {
-            fs::remove(directory_entry.path());
-          }
-          else {
+          delete_spot = spot.is_expired();
+
+          if(!delete_spot) {
             result.insert({ directory_entry.path(), spot });
           }
         }
         catch(...) {
-          std::cout << "Warning - deleting broken lock spot:" << directory_entry.path() << std::endl;
+          std::cerr << "Warning - deleting broken lock spot:" << directory_entry.path() << std::endl;
+          delete_spot = true;
+        }
+
+        if(delete_spot) {
           boost::system::error_code fsec;
-          fs::remove(directory_entry.path(), fsec); // fail silently...
+          fs::remove(directory_entry.path(), fsec); // fail silently... 
         }
       }
     }
@@ -344,6 +349,8 @@ namespace tipi::goldilock
       ("no-timeout", "Do not timeout when using --unlockfile")
       ("detach", "Launch a detached copy with the same parameters otherwise")
       ("lock-success-marker", "A marker file to write when all logs got acquired", cxxopts::value<std::vector<std::string>>())
+      ("watch-parent-process", "Unlock if the selected parent process exits", cxxopts::value<std::vector<std::string>>())
+      ("search-nearest-parent-process", "By default --watch-parent-process looks up for the furthest removed parent process, set this flag to search for the nearest parent instead")
       ("version", "Print the version of goldilock")
     ;
 
@@ -373,6 +380,13 @@ namespace tipi::goldilock
     bool valid_cli = true;
 
     bool goldilock_run_command = (cli_result.count("unlockfile") == 0);
+    bool goldilock_watch_parent_process = (cli_result.count("watch-parent-process") > 0);
+    bool goldilock_watch_parent_process_nearest = (cli_result.count("search-nearest-parent-process") > 0);
+    std::vector<std::string> watch_parent_process_names{};
+
+    if(goldilock_watch_parent_process) {
+      watch_parent_process_names = cli_result["watch-parent-process"].as<std::vector<std::string>>();
+    }
 
     if(goldilock_run_command && cli_result.unmatched().size() == 0) {
       cli_err = "You must supply a '-- <command>' argument for goldilock to run or specify --unlockfile <path> arguments";
@@ -462,6 +476,7 @@ namespace tipi::goldilock
 
       if(child_process.running() && marker_appeared) {
         child_process.detach();
+        fs::remove(temp_file);
         return 0;
       }
       else {
@@ -509,6 +524,57 @@ namespace tipi::goldilock
     std::thread io_thread([&]() {
       io.run();
     });
+
+    // note: declared here to not get out of scope before the end of program
+    boost::asio::steady_timer watch_parent_timer(io);
+
+    std::optional<pid_t> locking_parent_pid;
+    std::function<void(const boost::system::error_code&)> watch_parent_tick_fn;
+    watch_parent_tick_fn = [&](const boost::system::error_code& ec) {
+      log << "(watch_parent_tick_fn) Checking parent running" << std::endl;
+      if(ec == boost::asio::error::operation_aborted) {
+        log << "(watch_parent_tick_fn) aborted?: " << ec.what() << std::endl;
+        return;
+      }
+
+      // watch process
+      if(locking_parent_pid && process_info::is_process_running(locking_parent_pid.value()) && !exit_requested) {
+
+        log << "(watch_parent_tick_fn) still running parent: " << locking_parent_pid.value() << std::endl;
+        // still up & running -> schedule next interval
+        watch_parent_timer.expires_after(200ms);
+        watch_parent_timer.async_wait(watch_parent_tick_fn); 
+      }
+      else {
+        log << "(watch_parent_tick_fn) parent not running or exit_requested (" << std::to_string(exit_requested) << ")" << std::endl;
+        exit_requested = true;
+        return;
+      }       
+    };
+
+    // start watching the process asap
+    if(goldilock_watch_parent_process) {
+      // determine parent process id
+      locking_parent_pid = process_info::get_parent_pid_by_name(watch_parent_process_names, goldilock_watch_parent_process_nearest);
+
+      if(!locking_parent_pid) {
+        std::cout << "Fatal: No parent process with any of the following names was found: ";
+
+        for(const auto& n : watch_parent_process_names) {
+          std::cout << "'" << n << "' ";
+        }
+
+        std::cout << std::endl;
+        io.stop();
+        io_thread.join();
+        return 1;
+      }
+
+      log << "Watching parent process with pid: " << locking_parent_pid.value() << std::endl;
+
+      // schedule first run
+      watch_parent_timer.async_wait(watch_parent_tick_fn);
+    }
 
     bool got_all_locks = false;
     size_t do_update_counter = 0;
@@ -578,28 +644,34 @@ namespace tipi::goldilock
     bool watched_process_is_running = true;
 
     // make sure the locks we have gotten ourselves are being updated with our time!
-    std::thread lock_holder_thread([&]() {
+    boost::asio::steady_timer hold_lock_timer(io);
+    std::function<void(const boost::system::error_code&)> hold_lock_tick_fn;
 
-      size_t update = 0;
-
-      while(watched_process_is_running && !exit_requested) {
-
-        if(update % 20 == 0) { // 20x50ms = 1s
-          update = 0;
-
-          for(auto& [target, spot] : spots) {
-            spot.update_spot();
-          }         
-        }
-
-        update++;
-        std::this_thread::sleep_for(50ms);
+    hold_lock_tick_fn = [&](const boost::system::error_code& ec) {
+      log << "(hold_lock_tick_fn) tick " << std::endl;
+      if(ec == boost::asio::error::operation_aborted) {
+        return;
       }
-    });
+
+      // watch process
+      if(!exit_requested) {
+
+        for(auto& [target, spot] : spots) {
+          spot.update_spot();
+        }  
+
+        // schedule next interval
+        hold_lock_timer.expires_after(1s);
+        hold_lock_timer.async_wait(hold_lock_tick_fn); 
+        log << "(hold_lock_tick_fn) rescheduled" << std::endl;
+      }   
+    };
+
+    // schedule first run
+    hold_lock_timer.async_wait(hold_lock_tick_fn);
 
 
     size_t goldilock_exit_code = 1;
-
 
     if(goldilock_run_command) {
       
@@ -661,12 +733,16 @@ namespace tipi::goldilock
     }
     
 
-    watched_process_is_running = false;
+    exit_requested = true;
+
+    hold_lock_timer.cancel();
+    watch_parent_timer.cancel();
+
     io.stop();
 
-    if(lock_holder_thread.joinable()) {
+    /*if(lock_holder_thread.joinable()) {
       lock_holder_thread.join();
-    }
+    }*/
 
     if(io_thread.joinable()) {
       io_thread.join();
