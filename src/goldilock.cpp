@@ -95,6 +95,11 @@ namespace tipi::goldilock
 
       show_help = cli_result.count("help") > 0;
       show_version = cli_result.count("version") > 0;
+
+      if(show_help || show_version) {
+        return;
+      }
+
       verbose = cli_result.count("verbose") > 0;
       detach = cli_result.count("detach") > 0;
       search_for_nearest_parent_process = cli_result.count("search-nearest-parent-process") > 0;
