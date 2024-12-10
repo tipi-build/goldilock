@@ -6,7 +6,7 @@ on:
       - develop
   pull_request:
 env:
-  version_in_development: v0.0.1
+  version_in_development: v1.1.0
 
 jobs:
   draft-release:
@@ -39,13 +39,9 @@ jobs:
       - uses: actions/checkout@v2
       - name: install and build 
         run: |
-          cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
           cmake --build build/macos
-          zip -j goldilock-macos.zip ./build/macos/src/goldilock
-      - uses: actions/upload-artifact@v3
-        with:
-          name: goldilock_macos_artifact
-          path: ./goldilock-macos.zip
+          cd build/macos/ && cpack -G ZIP
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
         id: upload-tipi-goldilock-package 
@@ -54,7 +50,7 @@ jobs:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{needs.draft-release.outputs.upload_url}}
-          asset_path: ./goldilock-macos.zip
+          asset_path: ./build/macos/goldilock.zip
           asset_name: goldilock-macos.zip
           asset_content_type: application/zip
 
@@ -66,13 +62,9 @@ jobs:
       - uses: actions/checkout@v2
       - name: install and build 
         run: |
-          cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
           cmake --build build/macos
-          zip -j goldilock-macos-intel.zip ./build/macos/src/goldilock
-      - uses: actions/upload-artifact@v3
-        with:
-          name: goldilock_macos_artifact
-          path: ./goldilock-macos-intel.zip
+          cd build/macos/ && cpack -G ZIP
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
         id: upload-tipi-goldilock-package 
@@ -81,50 +73,23 @@ jobs:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{needs.draft-release.outputs.upload_url}}
-          asset_path: ./goldilock-macos-intel.zip
+          asset_path: ./build/macos/goldilock.zip
           asset_name: goldilock-macos-intel.zip
           asset_content_type: application/zip
 
   build-linux:
     name: build-linux
     runs-on: ubuntu-latest
-    container:
-      image: ubuntu:latest
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-      env:
-        TIPI_HOME_DIR: /usr/local/share/.tipi
+    container: 
+      image: tipibuild/tipi-ubuntu:latest
     needs: draft-release
     steps:
-      - name: setup docker
-        run: |
-          apt-get update
-          apt-get install -y docker.io zip
       - uses: actions/checkout@v2
       - name: install and build 
         run: |
-            docker pull tipibuild/tipi-ubuntu-1604:v0.0.65
-            docker run --name tipi1604 \
-            --volume ${{ github.workspace }}:${{ github.workspace }} \
-            --env TIPI_ACCESS_TOKEN \
-            --env TIPI_REFRESH_TOKEN \
-            --env TIPI_VAULT_PASSPHRASE \
-            --env TIPI_DISTRO_MODE=all \
-            --env TIPI_POWWOW \
-            --env TIPI_CACHE_FORCE_ENABLE \
-            --env TIPI_CACHE_CONSUME_ONLY \
-            --user $(id -u):$(id -g) \
-            --detach \
-            --workdir ${{ github.workspace }} \
-            tipibuild/tipi-ubuntu-1604:v0.0.65 \
-            sleep infinity
-            docker exec --user $(id -u):$(id -g) tipi1604 /bin/bash -c "tipi run cmake -S . -B build/linux -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17-linux-static.cmake -DCMAKE_BUILD_TYPE=Release"
-            docker exec --user $(id -u):$(id -g) tipi1604 /bin/bash -c "tipi run cmake --build build/linux"
-            zip -j goldilock-linux.zip ./build/linux/src/goldilock
-      - uses: actions/upload-artifact@v3
-        with:
-          name: goldilock_linux_artifact
-          path: ./goldilock-linux.zip
+          tipi run cmake -S . -B build/linux -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-cxx17-static.cmake -DCMAKE_BUILD_TYPE=Release
+          tipi run cmake --build build/linux
+          cd build/linux/ && tipi run cpack -G ZIP
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
         id: upload-tipi-goldilock-package 
@@ -133,6 +98,6 @@ jobs:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{needs.draft-release.outputs.upload_url}}
-          asset_path: ./goldilock-linux.zip
+          asset_path: ./build/linux/goldilock.zip
           asset_name: goldilock-linux.zip
           asset_content_type: application/zip
