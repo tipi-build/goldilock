@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Create Release
         id: draft_release
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/develop' || github.head_ref == 'feature/fix-toolchain-use'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,6 +52,29 @@ jobs:
           upload_url: ${{needs.draft-release.outputs.upload_url}}
           asset_path: ./build/macos/goldilock.zip
           asset_name: goldilock-macos.zip
+          asset_content_type: application/zip
+
+  build-macos-intel:
+    name: build-macos-intel
+    runs-on: macos-13
+    needs: draft-release
+    steps:
+      - uses: actions/checkout@v2
+      - name: install and build 
+        run: |
+          cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/macos
+          cd build/macos/ && cpack -G ZIP
+      - name: Upload goldilock package
+        if: ${{needs.draft-release.outputs.upload_url}}
+        id: upload-tipi-goldilock-package 
+        uses: actions/upload-release-asset@v1
+        env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{needs.draft-release.outputs.upload_url}}
+          asset_path: ./build/macos/goldilock.zip
+          asset_name: goldilock-macos-intel.zip
           asset_content_type: application/zip
 
   build-linux:
