@@ -1,7 +1,3 @@
-include_guard()
-
-include(${CMAKE_CURRENT_LIST_DIR}/compiler/clang.cmake)
-
 set(CMAKE_CXX_FLAGS_INIT "-std=c++17" CACHE STRING "" FORCE)  
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ Standard (toolchain)" FORCE)
 set(CMAKE_CXX_STANDARD_REQUIRED YES CACHE BOOL "C++ Standard required" FORCE)
