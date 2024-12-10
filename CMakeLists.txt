@@ -26,12 +26,13 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(cxxopts)
-set(BOOST_INCLUDE_LIBRARIES system filesystem process regex lexical_cast process scope_exit asio uuid serialization interprocess)
+set(BOOST_INCLUDE_LIBRARIES system filesystem)
 FetchContent_Declare(
   boost
-  URL      https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.gz
-  URL_HASH MD5=b21c059b592a041e90ae328fc5a8861b # tag boost-1.85.0
+  GIT_REPOSITORY https://github.com/tipi-build/boost
+  GIT_TAG        eab5b4b199f57aee86a4dc64cf3682b970507e09 # tag boost-1.85.0
 )
+
 
 FetchContent_MakeAvailable(boost)
 
