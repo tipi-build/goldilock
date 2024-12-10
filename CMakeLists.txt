@@ -26,9 +26,10 @@ FetchContent_MakeAvailable(cxxopts)
 set(BOOST_INCLUDE_LIBRARIES system filesystem)
 FetchContent_Declare(
   boost
-  GIT_REPOSITORY https://github.com/boostorg/boost.git
-  GIT_TAG        ab7968a0bbcf574a7859240d1d8443f58ed6f6cf # tag boost-1.85.0
+  URL      https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.gz
+  URL_HASH MD5=b21c059b592a041e90ae328fc5a8861b # tag boost-1.85.0
 )
+
 
 FetchContent_MakeAvailable(boost)
 
