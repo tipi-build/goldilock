@@ -2,6 +2,6 @@
 #include <string>
 
 namespace tipi::goldilock {
-    const std::string GOLDILOCK_VERSION = "1.1";
+    const std::string GOLDILOCK_VERSION = "v1.1.0";
     const std::string GOLDILOCK_GIT_REVISION = "@GOLDILOCK_GIT_REVISION@";
 }
