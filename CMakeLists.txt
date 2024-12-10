@@ -26,9 +26,10 @@ FetchContent_MakeAvailable(cxxopts)
 set(BOOST_INCLUDE_LIBRARIES system filesystem)
 FetchContent_Declare(
   boost
-  GIT_REPOSITORY https://github.com/boostorg/boost.git
-  GIT_TAG        ab7968a0bbcf574a7859240d1d8443f58ed6f6cf # tag boost-1.85.0
+  GIT_REPOSITORY https://github.com/tipi-build/boost
+  GIT_TAG        eab5b4b199f57aee86a4dc64cf3682b970507e09 # tag boost-1.85.0
 )
+
 
 FetchContent_MakeAvailable(boost)
 
