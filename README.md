@@ -67,7 +67,7 @@ tipi . -t linux-cxx17
 ... or by using the provided `cmake` build system:
 
 ```shell
-mkdir build/host
+mkdir -p build/host
 cmake -S . -B build/host -GNinja -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17.cmake
 cmake --build build/host
 ```
