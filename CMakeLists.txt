@@ -23,6 +23,16 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(cxxopts)
+set(BOOST_INCLUDE_LIBRARIES system filesystem)
+FetchContent_Declare(
+  boost
+  GIT_REPOSITORY https://github.com/tipi-build/boost
+  GIT_TAG        eab5b4b199f57aee86a4dc64cf3682b970507e09 # tag boost-1.85.0
+)
+
+
+FetchContent_MakeAvailable(boost)
+
 
 find_package(Threads)
 
