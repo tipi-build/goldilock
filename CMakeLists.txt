@@ -26,7 +26,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(cxxopts)
-set(BOOST_INCLUDE_LIBRARIES system filesystem)
+set(BOOST_INCLUDE_LIBRARIES system filesystem regex lexical_cast process scope_exit uuid interprocess serialization)
 FetchContent_Declare(
   boost
   GIT_REPOSITORY https://github.com/tipi-build/boost
