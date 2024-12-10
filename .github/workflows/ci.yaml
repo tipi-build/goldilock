@@ -72,7 +72,7 @@ jobs:
       - name: setup docker
         run: |
           apt-get update
-          apt-get install -y docker.io
+          apt-get install -y docker.io zip
       - uses: actions/checkout@v2
       - name: install and build 
         run: |
