@@ -42,10 +42,6 @@ jobs:
           cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
           cmake --build build/macos
           cd build/macos/ && cpack -G ZIP
-      - uses: actions/upload-artifact@v3
-        with:
-          name: goldilock_macos_artifact
-          path: ./build/macos/goldilock.zip
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
         id: upload-tipi-goldilock-package 
@@ -54,7 +50,7 @@ jobs:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{needs.draft-release.outputs.upload_url}}
-          asset_path: ./goldilock.zip
+          asset_path: ./build/macos/goldilock.zip
           asset_name: goldilock-macos.zip
           asset_content_type: application/zip
 
@@ -71,10 +67,6 @@ jobs:
           tipi run cmake -S . -B build/linux -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-cxx17-static.cmake -DCMAKE_BUILD_TYPE=Release
           tipi run cmake --build build/linux
           cd build/linux/ && tipi run cpack -G ZIP
-      - uses: actions/upload-artifact@v3
-        with:
-          name: goldilock_linux_artifact
-          path: ./build/linux/goldilock.zip
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
         id: upload-tipi-goldilock-package 
@@ -83,6 +75,6 @@ jobs:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{needs.draft-release.outputs.upload_url}}
-          asset_path: ./goldilock.zip
+          asset_path: ./build/linux/goldilock.zip
           asset_name: goldilock-linux.zip
           asset_content_type: application/zip
