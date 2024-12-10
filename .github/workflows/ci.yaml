@@ -41,7 +41,7 @@ jobs:
         run: |
           cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
           cmake --build build/macos
-          cd build/macos/ && tipi run cpack -G ZIP
+          cd build/macos/ && cpack -G ZIP
       - uses: actions/upload-artifact@v3
         with:
           name: goldilock_macos_artifact
