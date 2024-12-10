@@ -1,0 +1,88 @@
+name: build
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+env:
+  version_in_development: v0.0.1
+
+jobs:
+  draft-release:
+    name: Draft Release if develop branch
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.draft_release.outputs.upload_url }}  
+      release_id: ${{ steps.draft_release.outputs.id }}  
+    steps:
+      - name: Create Release
+        id: draft_release
+        if: github.ref == 'refs/heads/develop'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          owner: tipi-build 
+          repo: goldilock
+          commitish: ${{ github.sha }}
+          tag_name: ${{ env.version_in_development }}
+          release_name: ${{ env.version_in_development }} ${{ github.sha }}
+          draft: true
+          prerelease: true 
+
+  build-macos:
+    name: build-macos
+    runs-on: macos-latest
+    needs: draft-release
+    steps:
+      - uses: actions/checkout@v2
+      - name: install and build 
+        run: |
+          cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/macos
+          zip -j goldilock-macos.zip ./build/macos/src/goldilock
+      - uses: actions/upload-artifact@v3
+        with:
+          name: goldilock_macos_artifact
+          path: ./goldilock-macos.zip
+      - name: Upload goldilock package
+        if: ${{needs.draft-release.outputs.upload_url}}
+        id: upload-tipi-goldilock-package 
+        uses: actions/upload-release-asset@v1
+        env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{needs.draft-release.outputs.upload_url}}
+          asset_path: ./goldilock-macos.zip
+          asset_name: goldilock-macos.zip
+          asset_content_type: application/zip
+
+  build-linux:
+    name: build-linux
+    runs-on: ubuntu-latest
+    container: 
+      image: tipibuild/tipi-ubuntu-1604
+    needs: draft-release
+    steps:
+      - uses: actions/checkout@v2
+      - name: install and build 
+        run: |
+          cmake -S . -B build/linux -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/linux
+          zip -j goldilock-linux.zip ./build/linux/src/goldilock
+      - uses: actions/upload-artifact@v3
+        with:
+          name: goldilock_linux_artifact
+          path: ./goldilock-linux.zip
+      - name: Upload goldilock package
+        if: ${{needs.draft-release.outputs.upload_url}}
+        id: upload-tipi-goldilock-package 
+        uses: actions/upload-release-asset@v1
+        env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{needs.draft-release.outputs.upload_url}}
+          asset_path: ./goldilock-linux.zip
+          asset_name: goldilock-linux.zip
+          asset_content_type: application/zip
