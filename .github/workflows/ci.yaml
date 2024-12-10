@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Create Release
         id: draft_release
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/develop' || github.head_ref == 'feature/fix-toolchain-use'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
