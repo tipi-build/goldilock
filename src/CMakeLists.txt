@@ -14,3 +14,10 @@ target_include_directories(goldilock PRIVATE ${CMAKE_BINARY_DIR}/generated_sourc
 install(TARGETS goldilock RUNTIME DESTINATION bin)
 
 add_dependencies(goldilock version_header)
+
+install(TARGETS goldilock RUNTIME DESTINATION bin)
+
+set(CPACK_PACKAGE_NAME "goldilock")
+set(CPACK_PACKAGE_VENDOR "tipi.build")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}")
+include(CPack)

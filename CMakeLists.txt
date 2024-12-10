@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.27.6)
 set(FETCHCONTENT_QUIET OFF CACHE BOOL "" FORCE)
 
 project(goldilock 
-  VERSION "0.0.1"
+  VERSION "1.1.0"
   LANGUAGES CXX
 )
 enable_testing()
