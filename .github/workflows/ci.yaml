@@ -91,7 +91,7 @@ jobs:
             --workdir ${{ github.workspace }} \
             tipibuild/tipi-ubuntu-1604:v0.0.65 \
             sleep infinity
-            docker exec --user $(id -u):$(id -g) tipi1604 /bin/bash -c "tipi run cmake -S . -B build/linux -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17.cmake -DCMAKE_BUILD_TYPE=Release"
+            docker exec --user $(id -u):$(id -g) tipi1604 /bin/bash -c "tipi run cmake -S . -B build/linux -DCMAKE_TOOLCHAIN_FILE=environments/host-cxx17-linux-static.cmake -DCMAKE_BUILD_TYPE=Release"
             docker exec --user $(id -u):$(id -g) tipi1604 /bin/bash -c "tipi run cmake --build build/linux"
             zip -j goldilock-linux.zip ./build/linux/src/goldilock
       - uses: actions/upload-artifact@v3
