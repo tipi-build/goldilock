@@ -126,8 +126,8 @@ namespace tipi::goldilock {
 
         // now read and see if the contents are as expected
         {
-          auto read_back = goldilock_spot::read_from(spot_path, lockfile_);
-          got_spot = (read_back.get_guid() == get_guid() && read_back.get_timestamp() ==  get_timestamp());
+          auto read_back = goldilock_spot::try_read_from(spot_path, lockfile_);
+          got_spot = (read_back.has_value() && read_back->get_guid() == get_guid() && read_back->get_timestamp() ==  get_timestamp());
         }
 
         if(got_spot) {
@@ -170,6 +170,17 @@ namespace tipi::goldilock {
       result.owned_ = false;
       result.spot_index_ = extract_lockfile_spot_index(result.lockfile_, spot_on_disk).value();      
       return result;
+    }
+
+    static std::optional<goldilock_spot> try_read_from(const fs::path& spot_on_disk, const fs::path& lockfile_path) {
+      try {
+        return read_from(spot_on_disk, lockfile_path);
+      }
+      catch(...) {
+        //
+      }
+
+      return std::nullopt;
     }
 
     bool is_first_in_line() const {
