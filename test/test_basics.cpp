@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <thread>
 
 #include <goldilock/file.hpp>
 
@@ -141,5 +142,141 @@ namespace goldilock::test {
     BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[Z]{100}"}));
   }
 
-  
+  BOOST_AUTO_TEST_CASE(goldilocked_write_multiple_lockfiles) {
+
+    auto wd = get_goldilock_case_working_dir();
+    fs::create_directories(wd);
+
+    const fs::path support_app_append_to_file_bin = fs::current_path() / "test" / host_executable_name("support_app_append_to_file");
+    const fs::path write_output_dest = wd / "test.txt";
+
+    // Test a situation with multiple lockfiles
+    //
+    // goldilock "Master" will lock lockfile_A lockfile_B lockfile_C lockfile_D
+    // goldilock "A"      will lock lockfile_A lockfile_B lockfile_C
+    // goldilock "B"      will lock            lockfile_B lockfile_C
+    // goldilock "C"      will lock            lockfile_B            lockfile_D
+    // goldilock "D"      will lock lockfile_A lockfile_B lockfile_C lockfile_D
+    //
+    // We will start the Master first and have it wait for an unlock file to appear
+    // then, we will start all other goldilocks and release the Master
+
+    const std::string master_unlockfile = (wd / "master_unlockfile").generic_string();
+    const std::string master_all_locks_acquired = (wd / "master_locked.marker").generic_string();
+    const std::string gl_A_lockfile = (wd / "lockfile_A").generic_string();
+    const std::string gl_B_lockfile = (wd / "lockfile_B").generic_string();
+    const std::string gl_C_lockfile = (wd / "lockfile_C").generic_string();
+    const std::string gl_D_lockfile = (wd / "lockfile_D").generic_string();
+
+
+    std::thread t_master([&](){ 
+      auto result = run_goldilock_command_in(wd, 
+        "--lockfile", gl_A_lockfile,
+        "--lockfile", gl_B_lockfile,
+        "--lockfile", gl_C_lockfile,
+        "--lockfile", gl_D_lockfile,
+        "--unlockfile", master_unlockfile,
+        "--lock-success-marker", master_all_locks_acquired
+      );      
+      
+      BOOST_REQUIRE(result.return_code == 0);
+    });
+
+    auto wait_for_file = [](const fs::path& path) {
+      bool found_file = false;
+      size_t retries = 50;
+      while(--retries > 0) {
+        found_file = fs::exists(path); 
+        if(!found_file) {
+          std::this_thread::sleep_for(50ms);
+        }
+        else {
+          break;
+        }
+      }
+
+      return found_file;
+    };
+    
+    BOOST_REQUIRE(wait_for_file(master_all_locks_acquired));
+
+    //
+    // now start all the other goldilocks
+    std::thread t_gl_A([&](){ 
+      auto result = run_goldilock_command_in(wd, 
+        "--lockfile", gl_A_lockfile, "--lockfile", gl_B_lockfile, "--lockfile", gl_C_lockfile, 
+        "--", 
+          support_app_append_to_file_bin, 
+            "-s", "A", // <---
+            "-n", "100", 
+            "-f", write_output_dest.generic_string(), 
+            "-i", "1"
+      );
+      BOOST_REQUIRE(result.return_code == 0);
+    });
+
+    std::thread t_gl_B([&](){ 
+      auto result = run_goldilock_command_in(wd, 
+        "--lockfile", gl_B_lockfile, "--lockfile", gl_C_lockfile, 
+        "--", 
+          support_app_append_to_file_bin, 
+            "-s", "B",  // <---
+            "-n", "100", 
+            "-f", write_output_dest.generic_string(), 
+            "-i", "1"
+      );
+      BOOST_REQUIRE(result.return_code == 0);
+    });
+
+    std::thread t_gl_C([&](){ 
+      auto result = run_goldilock_command_in(wd, 
+        "--lockfile", gl_B_lockfile, "--lockfile", gl_D_lockfile, 
+        "--", 
+          support_app_append_to_file_bin, 
+            "-s", "C",  // <---
+            "-n", "100", 
+            "-f", write_output_dest.generic_string(), 
+            "-i", "1"
+      );
+      BOOST_REQUIRE(result.return_code == 0);
+    });
+
+    std::thread t_gl_D([&](){ 
+      auto result = run_goldilock_command_in(wd,
+        "--lockfile", gl_A_lockfile, "--lockfile", gl_B_lockfile, "--lockfile", gl_C_lockfile, "--lockfile", gl_D_lockfile, 
+        "--", 
+          support_app_append_to_file_bin, 
+            "-s", "D",  // <---
+            "-n", "100", 
+            "-f", write_output_dest.generic_string(), 
+            "-i", "1"
+      );
+      BOOST_REQUIRE(result.return_code == 0);
+    });
+
+
+    // here, none of the goldilocks above should be released or have started their configured app
+    // so the output should not yet exist!
+    BOOST_REQUIRE(!fs::exists(write_output_dest));
+
+    // this should release 
+    tipi::goldilock::file::touch_file(master_unlockfile);
+    BOOST_REQUIRE(wait_for_file(write_output_dest));
+
+    t_master.join();
+    t_gl_A.join();
+    t_gl_B.join();
+    t_gl_C.join();
+    t_gl_D.join();
+
+    auto file_content = tipi::goldilock::file::read_file_content(write_output_dest);
+    std::cout << "Testing goldilocked multilogfile write output:\n-------------\n" << file_content << "\n-------------\nExpecting no mixing of A|B|C|D" << std::endl;
+    
+    BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"^([ABCD]{400})$"}));
+    BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[A]{100}"}));
+    BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[B]{100}"}));
+    BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[C]{100}"}));
+    BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[D]{100}"}));
+
+  }
 }

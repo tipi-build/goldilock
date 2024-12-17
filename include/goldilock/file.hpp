@@ -32,4 +32,13 @@ namespace tipi::goldilock::file {
     return read_file_content(filename.generic_string());
   }
 
+  inline void touch_file(const std::string& path) {
+    std::fstream ofs(path, std::ios::out | std::ios::trunc | std::ios::in | std::ios::binary);
+    ofs.close();
+  }
+
+  inline void touch_file(const boost::filesystem::path& filename) {
+    touch_file(filename.generic_string());
+  }
+
 }
