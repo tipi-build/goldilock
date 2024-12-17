@@ -97,6 +97,7 @@ namespace tipi::goldilock
       show_version = cli_result.count("version") > 0;
 
       if(show_help || show_version) {
+        valid_cli = true;
         return;
       }
 
@@ -291,7 +292,6 @@ namespace tipi::goldilock
       ofs.close();
     };
 
-
     //
     // normal operations 
     //
@@ -423,7 +423,7 @@ namespace tipi::goldilock
 
         for(auto& [target, spot] : spots) {
           spot.update_spot();
-        }  
+        }
 
         // schedule next interval
         hold_lock_timer.expires_after(2s);
@@ -547,6 +547,8 @@ namespace tipi::goldilock
     hold_lock_timer.cancel();
     watch_parent_timer.cancel();
     signals.cancel();
+    spots.clear();
+    file_locks.clear();
     clean_stop_io();
 
     return goldilock_exit_code;

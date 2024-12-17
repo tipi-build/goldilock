@@ -291,18 +291,30 @@ namespace tipi::goldilock {
       if(locker_in_line.has_value()) {
 
         bool delete_spot = false;
+        bool read_success = false;
 
-        try {
-          auto spot = goldilock_spot::read_from(directory_entry.path(), lockfile_path);
-          delete_spot = spot.is_expired();
+        size_t read_retries = 0;
+        const size_t max_read_retries = 50;
 
-          if(!delete_spot) {
-            result.insert({ directory_entry.path(), spot });
+        while(!read_success && read_retries++ < max_read_retries) {
+
+          try {
+            auto spot = goldilock_spot::read_from(directory_entry.path(), lockfile_path);
+            read_success = true;
+            delete_spot = spot.is_expired();
+
+            if(!delete_spot) {
+              result.insert({ directory_entry.path(), spot });
+            }
           }
-        }
-        catch(...) {
-          std::cerr << "Warning - deleting broken lock spot:" << directory_entry.path() << std::endl;
+          catch(...) {
+            // this is not totally unexpected... we have a couple of retries to make sure we don't fail on transient states
+          }
+        }    
+
+        if(!read_success && read_retries >= max_read_retries) {
           delete_spot = true;
+          std::cerr << "Warning - deleting broken lock spot:" << directory_entry.path() << std::endl;
         }
 
         if(delete_spot) {
