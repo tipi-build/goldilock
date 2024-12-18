@@ -418,7 +418,6 @@ namespace tipi::goldilock
 
     hold_lock_tick_fn = [&](const boost::system::error_code& ec) {
       if(ec == boost::asio::error::operation_aborted) {
-        log << "(hold_lock_tick_fn) abort requested " << std::endl;
         return;
       }
 
