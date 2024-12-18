@@ -35,10 +35,13 @@ namespace goldilock::test {
   
     boost::asio::io_service ios;
     std::future<std::string> out;
-    
+
     bp::child child_process{cmd..., ios, (bp::std_out & bp::std_err) > out, bp::std_in < stdin};
     ios.run();
-    child_process.wait();
+
+    if(child_process.joinable()) {
+      child_process.wait();
+    }
     result.return_code = child_process.exit_code();
 
     result.output = out.get();
