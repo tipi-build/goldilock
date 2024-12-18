@@ -77,12 +77,16 @@ namespace goldilock::test {
 
     // note: on windows we could test up to full 16bits length, but this is kinda overkill already
     for(size_t ret = 0; ret < 255; ret++) {
-      auto result = goldilock::test::run_cmd(bp::start_dir=wd,"/bin/bash/","-c","exit", std::to_string(ret));
-      std::cout<<result.output<<std::endl;
-      //run_goldilock_command_in(wd, "--lockfile", "test.lock", "--" , "sleep", "0.05", "&&", "exit", std::to_string(ret));
+      std::string cmd = "exit ";
+      cmd += std::to_string(ret);
 
-      std::cout<<"retrun code is "<<result.return_code<<" and expected is " <<ret<<std::endl;
-      BOOST_REQUIRE(result.return_code == ret);
+      std::future<std::string> out;
+      auto result = bp::system("/bin/bash", "-c", cmd, (bp::std_err & bp::std_out) > out, bp::std_in < stdin);
+      std::string output = out.get();
+      std::cout<<output<<std::endl;
+
+      std::cout<<"retrun code is "<<result<<" and expected is " <<ret<<std::endl;
+      BOOST_REQUIRE(result == ret);
     }     
   }
 
