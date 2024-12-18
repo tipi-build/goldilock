@@ -254,6 +254,10 @@ namespace tipi::goldilock
         }
       }
 
+      #if BOOST_OS_LINUX
+      signal(SIGCHLD, SIG_IGN); // we don't want to handle child signals from our deteched goldilock to avoid them handing around as zombies
+      #endif
+
       auto child_process = shell_run(cmd_ss.str(),
         #if BOOST_OS_WINDOWS
         new_window_handler(),
