@@ -38,7 +38,7 @@ namespace goldilock::test {
   
     std::future<std::string> out;
     result.return_code = bp::system(cmd..., (bp::std_err & bp::std_out) > out, bp::std_in < stdin);
-    std::this_thread::sleep_for(100ms);
+    std::this_thread::sleep_for(200ms);
 
     
     // trim end newlines/spaces
