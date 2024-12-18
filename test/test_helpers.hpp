@@ -31,6 +31,7 @@ namespace goldilock::test {
   template <class... Param> 
   inline run_cmd_result_t run_cmd(Param &&... cmd) {
     run_cmd_result_t result{};
+    result.return_code = 812;
   
     std::future<std::string> out;
     result.return_code = bp::system(cmd..., (bp::std_err & bp::std_out) > out, bp::std_in < stdin);
