@@ -516,6 +516,7 @@ namespace tipi::goldilock
       }
       
       goldilock_exit_code = child_process->exit_code();
+      std::cout<<"goldilock_exit_code was set with exit code "<<goldilock_exit_code<<std::endl;
     }
     // ...or wather for unlock files to appear
     else {
@@ -543,6 +544,7 @@ namespace tipi::goldilock
       }
 
       goldilock_exit_code = (found_all_files) ? 0 : 1;
+
       timeout_timer.cancel();
 
       if(found_all_files) {
@@ -561,6 +563,8 @@ namespace tipi::goldilock
     spots.clear();
     file_locks.clear();
     clean_stop_io();
+
+    log<<"goldilock_exit_code returns "<<goldilock_exit_code<<std::endl;
 
     return goldilock_exit_code;
   }
