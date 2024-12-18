@@ -287,11 +287,6 @@ namespace tipi::goldilock
       return child_ret.value_or(1); // only success if the child returned 0 too
     }
 
-    auto touch_file = [](const std::string& path) {
-      std::fstream ofs(path, std::ios::out | std::ios::trunc | std::ios::in | std::ios::binary);
-      ofs.close();
-    };
-
     //
     // normal operations 
     //
@@ -311,7 +306,7 @@ namespace tipi::goldilock
         
         // make sure the lock file exits to start with
         std::string lockfile_str = lockfile.generic_string();
-        touch_file(lockfile_str);
+        goldilock::file::touch_file(lockfile_str);
         file_locks.emplace(lockfile, lockfile_str.data());
 
       }
@@ -491,7 +486,7 @@ namespace tipi::goldilock
 
     if(options.should_write_success_markers()) {
       for(const auto& marker : options.success_markers) {
-        touch_file(marker);
+        goldilock::file::touch_file(marker);
       }
     }    
 

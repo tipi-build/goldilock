@@ -1,5 +1,6 @@
 #define BOOST_TEST_MODULE test_basics
 #include <boost/test/included/unit_test.hpp> 
+#include <boost/test/data/test_case.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
@@ -17,6 +18,7 @@
 #include <thread>
 
 #include <goldilock/file.hpp>
+#include <goldilock/process_info.hpp>
 
  
 namespace goldilock::test { 
@@ -24,6 +26,22 @@ namespace goldilock::test {
   namespace bp = boost::process;
 
   using namespace std::literals;
+
+  //!\brief wait for a file to apear
+  inline bool wait_for_file(const fs::path& path, size_t retries = 50, std::chrono::milliseconds retry_interval = 50ms) {
+    bool found_file = false;
+    while(--retries > 0) {
+      found_file = fs::exists(path); 
+      if(!found_file) {
+        std::this_thread::sleep_for(retry_interval);
+      }
+      else {
+        break;
+      }
+    }
+
+    return found_file;
+  }    
 
   BOOST_AUTO_TEST_CASE(goldilock_help_returns_success) {    
     auto result = run_goldilock_command("--help");
@@ -181,22 +199,6 @@ namespace goldilock::test {
       
       BOOST_REQUIRE(result.return_code == 0);
     });
-
-    auto wait_for_file = [](const fs::path& path) {
-      bool found_file = false;
-      size_t retries = 50;
-      while(--retries > 0) {
-        found_file = fs::exists(path); 
-        if(!found_file) {
-          std::this_thread::sleep_for(50ms);
-        }
-        else {
-          break;
-        }
-      }
-
-      return found_file;
-    };
     
     BOOST_REQUIRE(wait_for_file(master_all_locks_acquired));
 
@@ -277,6 +279,178 @@ namespace goldilock::test {
     BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[B]{100}"}));
     BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[C]{100}"}));
     BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[D]{100}"}));
+  }
+
+  static auto TEST_DATA_goldilock_lock_watch_parent_process__search_nearest = {
+    true,
+    false
+  };
+
+  BOOST_DATA_TEST_CASE(
+    goldilock_lock_watch_parent_process, 
+    boost::unit_test::data::make(TEST_DATA_goldilock_lock_watch_parent_process__search_nearest), 
+    td_search_nearest
+  ){
+    auto wd = get_goldilock_case_working_dir();
+    fs::create_directories(wd);
+
+    std::cout << "Working directory: " << wd << std::endl;
+
+    const std::string launcher_exe_name = host_executable_name("support_app_launcher");
+    const std::string support_app_launcher_bin = (fs::current_path() / "test" / launcher_exe_name).generic_string();
+
+    const std::string path_goldilock_watching_parent_lock_acquired_marker = (wd / "watcher_all_locks.marker").generic_string();
+    const std::string path_goldilock_stage2_lock_acquired_marker = (wd / "stage2_all_locks.marker").generic_string();
+    const std::string lockfile = (wd / "lockfile").generic_string();
+
+    const std::string path_pidfile_A = (wd / "pidfile_level_A").generic_string();
+    const std::string path_pidfile_B = (wd / "pidfile_level_B").generic_string();
+    const std::string path_pidfile_C = (wd / "pidfile_level_C").generic_string();
+
+    const std::string path_watchfile_A = (wd / "watchfile_level_A").generic_string();
+    const std::string path_watchfile_B = (wd / "watchfile_level_B").generic_string();
+    const std::string path_watchfile_C = (wd / "watchfile_level_C").generic_string();
+
+    std::vector<std::string> launch_chain;
+
+    auto add_launcher_lvl = [&](const std::string& watchfile, const std::string& pidfile) {      
+      launch_chain.push_back(support_app_launcher_bin);
+      launch_chain.push_back("-w");
+      launch_chain.push_back(watchfile);
+      launch_chain.push_back("-p");
+      launch_chain.push_back(pidfile);
+      launch_chain.push_back("--");
+    };  
+
+    add_launcher_lvl(path_watchfile_A, path_pidfile_A);  
+    add_launcher_lvl(path_watchfile_B, path_pidfile_B);
+    add_launcher_lvl(path_watchfile_C, path_pidfile_C);
+
+    // have one goldilock:
+    // - grab a lock
+    // - tell us it's got the lock
+    // - wait until the matched parent process exits
+    launch_chain.push_back(host_goldilock_executable_path());
+    launch_chain.push_back("--lockfile");
+    launch_chain.push_back(lockfile);
+    launch_chain.push_back("--unlockfile");
+    launch_chain.push_back("will_never_be_there.txt");
+    launch_chain.push_back("--lock-success-marker");
+    launch_chain.push_back(path_goldilock_watching_parent_lock_acquired_marker);
+    launch_chain.push_back("--watch-parent-process");
+    launch_chain.push_back(launcher_exe_name);
+    
+    if(td_search_nearest) {
+      std::cout << "Adding search nearest parameter to goldilock command" << std::endl;
+      launch_chain.push_back("--search-nearest-parent-process");
+    }
+
+    std::cout << "Running command: '";
+    for(const auto& arg : launch_chain) {
+      std::cout << arg << " ";
+    }
+    std::cout << "'" << std::endl;
+
+    auto check_process_running = [](const fs::path& pidfile) {
+      std::string fcontents = tipi::goldilock::file::read_file_content(pidfile);
+      return tipi::goldilock::process_info::is_process_running(std::stoi(fcontents));
+    };
+
+    auto test_launcher_exited = [&](const fs::path& pidfile) {
+      size_t retries = 10;      
+      bool launcher_running = check_process_running(pidfile);
+      
+      while(launcher_running && --retries > 0) {
+        launcher_running = check_process_running(pidfile);
+        if(launcher_running) {
+          std::this_thread::sleep_for(100ms);
+        }
+      }
+
+      std::cout << "Is running (" << pidfile << ") :" << std::to_string(launcher_running) << std::endl;;
+
+      return !launcher_running;
+    };
+
+    // run in bg
+    std::thread t_watcher([&](){ 
+      auto result = run_cmd(bp::start_dir=wd, launch_chain);
+      BOOST_REQUIRE(result.return_code == 0);
+    });
+    
+    BOOST_REQUIRE(wait_for_file(path_pidfile_A));
+    BOOST_REQUIRE(wait_for_file(path_pidfile_B));
+    BOOST_REQUIRE(wait_for_file(path_pidfile_C));
+    BOOST_REQUIRE(wait_for_file(path_goldilock_watching_parent_lock_acquired_marker));
+
+    bool expected_stage2_to_return = false;
+
+    std::thread t_stage2([&](){ 
+      BOOST_REQUIRE(expected_stage2_to_return == false);
+      auto result = run_goldilock_command_in(wd, "--lockfile", lockfile, "--lock-success-marker", path_goldilock_stage2_lock_acquired_marker, "--", "exit", "0");
+      BOOST_REQUIRE(result.return_code == 0);
+      BOOST_REQUIRE(expected_stage2_to_return == true);
+    });
+    
+    BOOST_REQUIRE(wait_for_file(path_goldilock_stage2_lock_acquired_marker) == false);
+    
+    BOOST_REQUIRE(check_process_running(path_pidfile_A));
+    BOOST_REQUIRE(check_process_running(path_pidfile_C));
+
+    // in any case we should be able to kill the "middle one" and keep up the lock
+    // as we're not watching that one anyway...
+    {
+      BOOST_REQUIRE(check_process_running(path_pidfile_B));
+      tipi::goldilock::file::touch_file(path_watchfile_B);
+      BOOST_REQUIRE(test_launcher_exited(path_pidfile_B));
+
+      // !! we hold the lock in the watcher still
+      BOOST_REQUIRE(wait_for_file(path_goldilock_stage2_lock_acquired_marker) == false);
+    }
+    
+    if(td_search_nearest) {
+      // if goldilock is watching the "nearest" launcher, then we should be able to kill
+      // levels A and B and still be waiting
+      BOOST_REQUIRE(check_process_running(path_pidfile_A));
+      tipi::goldilock::file::touch_file(path_watchfile_A);
+      BOOST_REQUIRE(test_launcher_exited(path_pidfile_A));
+    }
+    else {
+      // if we're watching the furthest launcher we can kill B and C and should be holding
+      // the "watcher lock"
+      BOOST_REQUIRE(check_process_running(path_pidfile_C));
+      tipi::goldilock::file::touch_file(path_watchfile_C);
+      BOOST_REQUIRE(test_launcher_exited(path_pidfile_C)); 
+    }
+
+    // !! we hold the lock in the watcher still
+    BOOST_REQUIRE(wait_for_file(path_goldilock_stage2_lock_acquired_marker) == false);
+
+    // now we will have the watched launcher terminate
+    // and check the the stage2 gets the lock and exists as planned
+    expected_stage2_to_return = true;
+
+    if(td_search_nearest) {
+      BOOST_REQUIRE(check_process_running(path_pidfile_C));
+      tipi::goldilock::file::touch_file(path_watchfile_C);
+      BOOST_REQUIRE(test_launcher_exited(path_pidfile_C));
+    }
+    else {
+      BOOST_REQUIRE(check_process_running(path_pidfile_A));
+      tipi::goldilock::file::touch_file(path_watchfile_A);
+      BOOST_REQUIRE(test_launcher_exited(path_pidfile_A)); 
+    }
+
+    // we got the lock!!
+    BOOST_REQUIRE(wait_for_file(path_goldilock_stage2_lock_acquired_marker));
+
+    // exit
+    t_watcher.join();
+    t_stage2.join();
+
+    BOOST_REQUIRE(test_launcher_exited(path_pidfile_A)); 
+    BOOST_REQUIRE(test_launcher_exited(path_pidfile_B)); 
+    BOOST_REQUIRE(test_launcher_exited(path_pidfile_C)); 
 
   }
 }

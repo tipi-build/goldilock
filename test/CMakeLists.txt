@@ -51,6 +51,7 @@ endforeach()
 
 set(test_support_apps_source_files
     "${CMAKE_CURRENT_LIST_DIR}/support_app_append_to_file.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/support_app_launcher.cpp"
 )
 
 foreach(source_file IN LISTS test_support_apps_source_files)
@@ -58,5 +59,5 @@ foreach(source_file IN LISTS test_support_apps_source_files)
 
     add_executable(${app_name} "${source_file}" )
     set_target_properties(${app_name} PROPERTIES OUTPUT_NAME ${app_name})
-    target_link_libraries(${app_name} goldilock::test_lib cxxopts)
+    target_link_libraries(${app_name} goldilock::test_lib cxxopts libgoldilock-utils::libgoldilock-utils)
 endforeach()
