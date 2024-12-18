@@ -343,12 +343,16 @@ namespace tipi::goldilock
     });
 
     auto clean_stop_io = [&io_thread, &io]() {
+      std::cout<<"clean_stop_io 1"<<std::endl;
       if(!io.stopped()){io.stop();}
      
-      
+      std::cout<<"clean_stop_io 2"<<std::endl;
+
       if(io_thread.joinable()) {
         io_thread.join();
       }
+      std::cout<<"clean_stop_io 3"<<std::endl;
+
     };
 
     // note: declared here to not get out of scope before the end of program
