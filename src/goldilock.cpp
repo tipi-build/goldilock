@@ -343,8 +343,9 @@ namespace tipi::goldilock
     });
 
     auto clean_stop_io = [&io_thread, &io]() {
-      io.stop();
-      
+      if(!io.stopped()){
+        io.stop();
+      }
       if(io_thread.joinable()) {
         io_thread.join();
       }
@@ -558,10 +559,7 @@ namespace tipi::goldilock
     hold_lock_timer.cancel();
     watch_parent_timer.cancel();
     signals.cancel();
-    spots.clear();
-    file_locks.clear();
     clean_stop_io();
-
     return goldilock_exit_code;
   }
   
