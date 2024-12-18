@@ -7,9 +7,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/process.hpp>
+#include <boost/asio/detail/signal_init.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
+#include <boost/scope_exit.hpp>
 
 #include <test_helpers.hpp>
 #include <string>
@@ -281,10 +283,7 @@ namespace goldilock::test {
     BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[D]{100}"}));
   }
 
-  static auto TEST_DATA_goldilock_lock_watch_parent_process__search_nearest = {
-    true,
-    false
-  };
+  static auto TEST_DATA_goldilock_lock_watch_parent_process__search_nearest = { true, false };
 
   BOOST_DATA_TEST_CASE(
     goldilock_lock_watch_parent_process, 
@@ -303,25 +302,33 @@ namespace goldilock::test {
     const std::string path_goldilock_stage2_lock_acquired_marker = (wd / "stage2_all_locks.marker").generic_string();
     const std::string lockfile = (wd / "lockfile").generic_string();
 
+    const std::string path_pidfile_daemonized = (wd / "pidfile_level_daemonized").generic_string();
     const std::string path_pidfile_A = (wd / "pidfile_level_A").generic_string();
     const std::string path_pidfile_B = (wd / "pidfile_level_B").generic_string();
     const std::string path_pidfile_C = (wd / "pidfile_level_C").generic_string();
 
+    const std::string path_watchfile_daemonized = (wd / "watchfile_level_daemonized").generic_string();
     const std::string path_watchfile_A = (wd / "watchfile_level_A").generic_string();
     const std::string path_watchfile_B = (wd / "watchfile_level_B").generic_string();
     const std::string path_watchfile_C = (wd / "watchfile_level_C").generic_string();
 
     std::vector<std::string> launch_chain;
 
-    auto add_launcher_lvl = [&](const std::string& watchfile, const std::string& pidfile) {      
+    auto add_launcher_lvl = [&](const std::string& watchfile, const std::string& pidfile, bool daemonize = false) {      
       launch_chain.push_back(support_app_launcher_bin);
       launch_chain.push_back("-w");
       launch_chain.push_back(watchfile);
       launch_chain.push_back("-p");
       launch_chain.push_back(pidfile);
+
+      if(daemonize) {
+        launch_chain.push_back("-d");
+      }
+
       launch_chain.push_back("--");
     };  
 
+    add_launcher_lvl(path_watchfile_daemonized, path_pidfile_daemonized, true);
     add_launcher_lvl(path_watchfile_A, path_pidfile_A);  
     add_launcher_lvl(path_watchfile_B, path_pidfile_B);
     add_launcher_lvl(path_watchfile_C, path_pidfile_C);
@@ -357,7 +364,7 @@ namespace goldilock::test {
     };
 
     auto test_launcher_exited = [&](const fs::path& pidfile) {
-      size_t retries = 10;      
+      size_t retries = 50;      
       bool launcher_running = check_process_running(pidfile);
       
       while(launcher_running && --retries > 0) {
@@ -367,20 +374,23 @@ namespace goldilock::test {
         }
       }
 
-      std::cout << "Is running (" << pidfile << ") :" << std::to_string(launcher_running) << std::endl;;
-
       return !launcher_running;
     };
 
-    // run in bg
-    std::thread t_watcher([&](){ 
+    // this should return immediately as we daemonize the outermost launcher
+    {
       auto result = run_cmd(bp::start_dir=wd, launch_chain);
-      BOOST_REQUIRE(result.return_code == 0);
-    });
+      BOOST_REQUIRE(result.return_code == 0); 
+      BOOST_REQUIRE(wait_for_file(path_pidfile_daemonized));
+      BOOST_REQUIRE(wait_for_file(path_pidfile_A));
+      BOOST_REQUIRE(wait_for_file(path_pidfile_B));
+      BOOST_REQUIRE(wait_for_file(path_pidfile_C));
+      BOOST_REQUIRE(check_process_running(path_pidfile_daemonized));
+      BOOST_REQUIRE(check_process_running(path_pidfile_A));
+      BOOST_REQUIRE(check_process_running(path_pidfile_B));
+      BOOST_REQUIRE(check_process_running(path_pidfile_C));
+    }
     
-    BOOST_REQUIRE(wait_for_file(path_pidfile_A));
-    BOOST_REQUIRE(wait_for_file(path_pidfile_B));
-    BOOST_REQUIRE(wait_for_file(path_pidfile_C));
     BOOST_REQUIRE(wait_for_file(path_goldilock_watching_parent_lock_acquired_marker));
 
     bool expected_stage2_to_return = false;
@@ -389,13 +399,12 @@ namespace goldilock::test {
       BOOST_REQUIRE(expected_stage2_to_return == false);
       auto result = run_goldilock_command_in(wd, "--lockfile", lockfile, "--lock-success-marker", path_goldilock_stage2_lock_acquired_marker, "--", "exit", "0");
       BOOST_REQUIRE(result.return_code == 0);
-      BOOST_REQUIRE(expected_stage2_to_return == true);
+      BOOST_REQUIRE(expected_stage2_to_return == true);      
     });
-    
+  
     BOOST_REQUIRE(wait_for_file(path_goldilock_stage2_lock_acquired_marker) == false);
-    
     BOOST_REQUIRE(check_process_running(path_pidfile_A));
-    BOOST_REQUIRE(check_process_running(path_pidfile_C));
+    BOOST_REQUIRE(check_process_running(path_pidfile_C)); 
 
     // in any case we should be able to kill the "middle one" and keep up the lock
     // as we're not watching that one anyway...
@@ -432,25 +441,33 @@ namespace goldilock::test {
 
     if(td_search_nearest) {
       BOOST_REQUIRE(check_process_running(path_pidfile_C));
-      tipi::goldilock::file::touch_file(path_watchfile_C);
+      tipi::goldilock::file::touch_file(path_watchfile_C);      
       BOOST_REQUIRE(test_launcher_exited(path_pidfile_C));
     }
     else {
       BOOST_REQUIRE(check_process_running(path_pidfile_A));
       tipi::goldilock::file::touch_file(path_watchfile_A);
-      BOOST_REQUIRE(test_launcher_exited(path_pidfile_A)); 
+      BOOST_REQUIRE(test_launcher_exited(path_pidfile_A));
+
+      // we need to kill the daemonized launcher as well because this will be the farthest 
+      // support_app_launcher that the goldilock will be looking for in this case...
+      BOOST_REQUIRE(check_process_running(path_pidfile_daemonized));
+      tipi::goldilock::file::touch_file(path_watchfile_daemonized);
+      BOOST_REQUIRE(test_launcher_exited(path_pidfile_daemonized));      
     }
 
     // we got the lock!!
     BOOST_REQUIRE(wait_for_file(path_goldilock_stage2_lock_acquired_marker));
 
-    // exit
-    t_watcher.join();
     t_stage2.join();
 
     BOOST_REQUIRE(test_launcher_exited(path_pidfile_A)); 
     BOOST_REQUIRE(test_launcher_exited(path_pidfile_B)); 
     BOOST_REQUIRE(test_launcher_exited(path_pidfile_C)); 
+
+    // don't leak the daemon
+    tipi::goldilock::file::touch_file(path_watchfile_daemonized);
+    BOOST_REQUIRE(test_launcher_exited(path_pidfile_daemonized));  
 
   }
 }

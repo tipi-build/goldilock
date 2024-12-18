@@ -14,6 +14,7 @@ target_link_libraries(test_lib INTERFACE
   Boost::included_unit_test_framework
   Boost::process 
   Boost::asio
+  Boost::scope_exit
   Threads::Threads
 )
 
