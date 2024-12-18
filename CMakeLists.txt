@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.27.6)
 set(FETCHCONTENT_QUIET OFF CACHE BOOL "" FORCE)
 
 project(goldilock 
-  VERSION "0.0.1"
+  VERSION "1.1.0"
   LANGUAGES CXX
 )
 enable_testing()
@@ -13,6 +13,9 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(WIN32)
+  add_compile_definitions(_WIN32_WINNT=0x0A00) # windows 10
+endif()
 
 include(FetchContent)
 
@@ -23,7 +26,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(cxxopts)
-set(BOOST_INCLUDE_LIBRARIES system filesystem)
+set(BOOST_INCLUDE_LIBRARIES system filesystem regex lexical_cast process scope_exit uuid interprocess serialization)
 FetchContent_Declare(
   boost
   GIT_REPOSITORY https://github.com/tipi-build/boost
@@ -32,7 +35,6 @@ FetchContent_Declare(
 
 
 FetchContent_MakeAvailable(boost)
-
 
 find_package(Threads)
 
