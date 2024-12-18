@@ -349,7 +349,10 @@ namespace tipi::goldilock
       std::cout<<"clean_stop_io 2"<<std::endl;
 
       if(io_thread.joinable()) {
+      std::cout<<"clean_stop_io 2.1"<<std::endl;
         io_thread.join();
+      std::cout<<"clean_stop_io 2.2"<<std::endl;
+
       }
       std::cout<<"clean_stop_io 3"<<std::endl;
 
