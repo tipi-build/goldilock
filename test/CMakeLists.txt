@@ -41,6 +41,7 @@ endfunction()
 
 set(test_source_files
     "${CMAKE_CURRENT_LIST_DIR}/test_basics.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/test_signals_robustness.cpp"
 )
 
 foreach(test_file IN LISTS test_source_files)

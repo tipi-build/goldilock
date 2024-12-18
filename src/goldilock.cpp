@@ -319,11 +319,17 @@ namespace tipi::goldilock
     // handle signals and deal with any running child process in that case
     boost::asio::signal_set signals(io, SIGINT, SIGTERM);
     signals.async_wait(
-      [&child_process, &exit_requested](boost::system::error_code error, int signal_number) { 
+      [&child_process, &exit_requested, &log](boost::system::error_code error, int signal_number) { 
         exit_requested = true;
 
         if(child_process.has_value() && child_process->joinable()) {
-          child_process->terminate();
+          try {
+            child_process->terminate();
+          }
+          catch(...) {
+            // it could be that the child received that signal already in which case we're done
+            log <<  "Error while waiting on child process - possibly terminated by signal" << std::endl;
+          }          
         }
       }
     );
@@ -497,9 +503,15 @@ namespace tipi::goldilock
       
       // setup the child process (wire up all i/o as passthrough)
       child_process = shell_run(io, options.command_mode_cmd, bp::std_out > stdout,  bp::std_err > stderr, bp::std_in < stdin);
-      child_process->wait();
-      goldilock_exit_code = child_process->exit_code();
 
+      try {
+        child_process->wait();
+      }
+      catch(...) {
+        log <<  "Error while waiting on child process - possibly terminated by signal" << std::endl;
+      }
+      
+      goldilock_exit_code = child_process->exit_code();
     }
     // ...or wather for unlock files to appear
     else {
