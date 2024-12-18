@@ -12,6 +12,7 @@
 #include <boost/uuid/random_generator.hpp>
 
 #include <test_helpers.hpp>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <optional>
@@ -74,8 +75,15 @@ namespace goldilock::test {
     fs::create_directories(wd);
 
     // note: on windows we could test up to full 16bits length, but this is kinda overkill already
-    for(size_t ret = 0; ret < 255; ret++) {
+    for(size_t ret = 0; ret < 128; ret++) {
       auto result = run_goldilock_command_in(wd, "--lockfile", "test.lock", "--", "exit", std::to_string(ret));
+      std::cout<<"retrun code is "<<result.return_code<<" and expected is " <<ret<<std::endl;
+      BOOST_REQUIRE(result.return_code == ret);
+    }    
+
+    for(size_t ret = 128; ret < 255; ret++) {
+      auto result = run_goldilock_command_in(wd, "--lockfile", "test.lock", "--", "exit", std::to_string(ret));
+      std::cout<<"retrun code is "<<result.return_code<<" and expected is " <<ret<<std::endl;
       BOOST_REQUIRE(result.return_code == ret);
     }    
   }
