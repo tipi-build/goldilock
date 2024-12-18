@@ -98,7 +98,9 @@ jobs:
         run: |
           tipi run cmake -S . -B build/linux -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-cxx17-static.cmake -DCMAKE_BUILD_TYPE=Release
           tipi run cmake --build build/linux
-          cd build/linux/ && tipi run cpack -G ZIP
+          cd build/linux/
+          tipi run cpack -G ZIP
+
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
         id: upload-tipi-goldilock-package 
@@ -112,5 +114,5 @@ jobs:
           asset_content_type: application/zip
       - name: Run tests
         run: |
-          cd build/macos/ 
+          cd build/linux/ 
           ctest --verbose
