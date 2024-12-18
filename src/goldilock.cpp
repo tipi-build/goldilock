@@ -556,15 +556,24 @@ namespace tipi::goldilock
     }
     
     // shutdown everything
+    std::cout<<"goldilock 0"<<std::endl;
     exit_requested = true;
+    std::cout<<"goldilock 1"<<std::endl;
     hold_lock_timer.cancel();
+    std::cout<<"goldilock 2"<<std::endl;
     watch_parent_timer.cancel();
+    std::cout<<"goldilock 3"<<std::endl;
     signals.cancel();
+    std::cout<<"goldilock 4"<<std::endl;
     spots.clear();
+    std::cout<<"goldilock 5"<<std::endl;
     file_locks.clear();
+    std::cout<<"goldilock 6"<<std::endl;
     clean_stop_io();
+    std::cout<<"goldilock 7"<<std::endl;
 
-    log<<"goldilock_exit_code returns "<<goldilock_exit_code<<std::endl;
+
+    std::cout<<"goldilock_exit_code returns "<<goldilock_exit_code<<std::endl;
 
     return goldilock_exit_code;
   }
