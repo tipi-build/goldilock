@@ -53,6 +53,10 @@ jobs:
           asset_path: ./build/macos/goldilock.zip
           asset_name: goldilock-macos.zip
           asset_content_type: application/zip
+      - name: Run tests
+        run: |
+          cd build/macos/ 
+          ctest --verbose
 
   build-macos-intel:
     name: build-macos-intel
@@ -64,7 +68,8 @@ jobs:
         run: |
           cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DCMAKE_BUILD_TYPE=Release
           cmake --build build/macos
-          cd build/macos/ && cpack -G ZIP
+          cd build/macos/ 
+          cpack -G ZIP
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
         id: upload-tipi-goldilock-package 
@@ -76,6 +81,10 @@ jobs:
           asset_path: ./build/macos/goldilock.zip
           asset_name: goldilock-macos-intel.zip
           asset_content_type: application/zip
+      - name: Run tests
+        run: |
+          cd build/macos/ 
+          ctest --verbose
 
   build-linux:
     name: build-linux
@@ -101,3 +110,7 @@ jobs:
           asset_path: ./build/linux/goldilock.zip
           asset_name: goldilock-linux.zip
           asset_content_type: application/zip
+      - name: Run tests
+        run: |
+          cd build/macos/ 
+          ctest --verbose
