@@ -33,7 +33,7 @@ namespace goldilock::test {
     run_cmd_result_t result{};
   
     std::future<std::string> out;
-    result.return_code = bp::system(cmd..., (bp::std_err & bp::std_out) > out, bp::std_in < stdin);
+    result.return_code = bp::system(cmd..., (bp::std_err & bp::std_out) > out, bp::std_in.close());
     
     // trim end newlines/spaces
     result.output = out.get();

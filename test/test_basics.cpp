@@ -79,7 +79,7 @@ namespace goldilock::test {
     for(size_t ret = 0; ret < 255; ret++) {
       auto result = run_goldilock_command_in(wd, "--lockfile", "test.lock", "--", "exit", std::to_string(ret));
       std::cout<<"retrun code is "<<result.return_code<<" and expected is " <<ret<<std::endl;
-      std::this_thread::sleep_for(500ms);
+      std::this_thread::sleep_for(1000ms);
       BOOST_REQUIRE(result.return_code == ret);
     }     
   }
