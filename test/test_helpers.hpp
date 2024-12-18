@@ -7,7 +7,6 @@
 #include <boost/process.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <boost/asio.hpp>
 #include <boost/regex.hpp>
 #include <iostream>
 #include <string>
@@ -36,14 +35,10 @@ namespace goldilock::test {
   template <class... Param> 
   inline run_cmd_result_t run_cmd(Param &&... cmd) {
     run_cmd_result_t result{};
-    boost::asio::io_service ios;
-
+  
     std::future<std::string> out;
-    bp::child child_process{cmd..., ios, (bp::std_out & bp::std_err) > out, bp::std_in < stdin};
-    ios.run();
-    child_process.wait();
-    result.return_code = child_process.exit_code();
-
+    result.return_code = bp::system(cmd..., (bp::std_err & bp::std_out) > out, bp::std_in < stdin);
+    std::this_thread::sleep_for(100ms);
 
     
     // trim end newlines/spaces
