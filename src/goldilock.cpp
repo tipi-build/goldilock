@@ -15,6 +15,7 @@
 #include <boost/process.hpp>
 #include <boost/process/handles.hpp>
 #include <boost/scope_exit.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 #if BOOST_OS_WINDOWS
 #include <boost/winapi/process.hpp>
 #endif
@@ -577,7 +578,12 @@ namespace tipi::goldilock
     std::cout<<"goldilock 5"<<std::endl;
     file_locks.clear();
     std::cout<<"goldilock 6"<<std::endl;
+    try{
     clean_stop_io();
+    }catch(...) {
+        std::cout << "goldilock 6 to 7 " << boost::current_exception_diagnostic_information() << std::endl;
+        return 812;
+      }
     std::cout<<"goldilock 7"<<std::endl;
 
 
