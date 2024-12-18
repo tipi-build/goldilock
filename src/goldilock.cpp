@@ -358,7 +358,7 @@ namespace tipi::goldilock
       }
       std::cout<<"clean_stop_io 3"<<std::endl;
       }catch(...) {
-        std::cout << "clean_stop_io big try " << boost::current_exception_diagnostic_information() << std::endl;
+        std::cerr << "clean_stop_io big try " << boost::current_exception_diagnostic_information() << std::endl;
       }
 
     };
@@ -585,7 +585,7 @@ namespace tipi::goldilock
 
     clean_stop_io();
     }catch(...) {
-        std::cout << "goldilock big try " << boost::current_exception_diagnostic_information() << std::endl;
+        std::cerr << "goldilock big try " << boost::current_exception_diagnostic_information() << std::endl;
         return 812;
       }
     std::cout<<"goldilock 7"<<std::endl;
