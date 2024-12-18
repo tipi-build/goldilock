@@ -254,7 +254,7 @@ namespace tipi::goldilock
         }
       }
 
-      #if BOOST_OS_LINUX
+      #if BOOST_OS_LINUX  || (BOOST_OS_MACOS && BOOST_ARCH_AARCH64)
       signal(SIGCHLD, SIG_IGN); // we don't want to handle child signals from our deteched goldilock to avoid them handing around as zombies
       #endif
 

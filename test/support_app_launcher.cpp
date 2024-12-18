@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     // doing the child launching in it own scope so
     // things get cleaned up to avoid handles hanging arround
     {      
-      #if BOOST_OS_LINUX
+      #if BOOST_OS_LINUX  || (BOOST_OS_MACOS && BOOST_ARCH_AARCH64)
       signal(SIGCHLD, SIG_IGN); // we don't want to handle child signals to avoid them handing around as zombies
       #endif
 
