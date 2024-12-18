@@ -1,5 +1,4 @@
 #pragma once
-
 #define BOOST_TEST_NO_MAIN
 #include <boost/test/included/unit_test.hpp>
 #undef BOOST_TEST_NO_MAIN
@@ -12,12 +11,17 @@
 #include <iostream>
 #include <string>
 #include <optional>
+#include <chrono>
+#include <thread>
+
 
 
 namespace goldilock::test { 
   namespace fs = boost::filesystem;
   namespace bp = boost::process;
   using namespace std::string_literals;
+  using namespace std::chrono_literals;
+
 
   struct run_cmd_result_t {
     std::string output;
@@ -31,10 +35,11 @@ namespace goldilock::test {
   template <class... Param> 
   inline run_cmd_result_t run_cmd(Param &&... cmd) {
     run_cmd_result_t result{};
-    result.return_code = 812;
   
     std::future<std::string> out;
     result.return_code = bp::system(cmd..., (bp::std_err & bp::std_out) > out, bp::std_in < stdin);
+    std::this_thread::sleep_for(100ms);
+
     
     // trim end newlines/spaces
     result.output = out.get();
