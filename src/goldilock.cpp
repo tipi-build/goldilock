@@ -15,7 +15,6 @@
 #include <boost/process.hpp>
 #include <boost/process/handles.hpp>
 #include <boost/scope_exit.hpp>
-#include <boost/exception/diagnostic_information.hpp>
 #if BOOST_OS_WINDOWS
 #include <boost/winapi/process.hpp>
 #endif
@@ -344,7 +343,6 @@ namespace tipi::goldilock
     });
 
     auto clean_stop_io = [&io_thread, &io]() {
-      try{
       std::cout<<"clean_stop_io 1"<<std::endl;
       if(!io.stopped()){io.stop();}
      
@@ -357,9 +355,6 @@ namespace tipi::goldilock
 
       }
       std::cout<<"clean_stop_io 3"<<std::endl;
-      }catch(...) {
-        std::cerr << "clean_stop_io big try " << boost::current_exception_diagnostic_information() << std::endl;
-      }
 
     };
 
@@ -567,7 +562,7 @@ namespace tipi::goldilock
         }
       }
     }
-    try{
+    
     // shutdown everything
     std::cout<<"goldilock 0"<<std::endl;
     exit_requested = true;
@@ -582,12 +577,7 @@ namespace tipi::goldilock
     std::cout<<"goldilock 5"<<std::endl;
     file_locks.clear();
     std::cout<<"goldilock 6"<<std::endl;
-
     clean_stop_io();
-    }catch(...) {
-        std::cerr << "goldilock big try " << boost::current_exception_diagnostic_information() << std::endl;
-        return 812;
-      }
     std::cout<<"goldilock 7"<<std::endl;
 
 
