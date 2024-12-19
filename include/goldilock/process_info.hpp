@@ -271,7 +271,7 @@ namespace tipi::goldilock::process_info {
 
     for(const auto& pi : proc_stack) {
       for(const auto& needle_raw : process_names) {
-        #if BOOST_OS_LINUX
+        #if BOOST_OS_LINUX || BOOST_OS_MACOS
         std::string needle = needle_raw.substr(0, 15);  // kernel truncates at 15 chars
         #else
         std::string needle = needle_raw;
