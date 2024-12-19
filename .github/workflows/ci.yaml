@@ -56,7 +56,7 @@ jobs:
       - name: Run tests
         run: |
           cd build/macos/ 
-          ctest --verbose
+          ctest --verbose -E test_docker
 
   build-macos-intel:
     name: build-macos-intel
@@ -84,18 +84,24 @@ jobs:
       - name: Run tests
         run: |
           cd build/macos/ 
-          ctest --verbose
+          ctest --verbose -E test_docker
 
   build-linux:
     name: build-linux
     runs-on: ubuntu-latest
     container: 
       image: tipibuild/tipi-ubuntu:latest
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
       # make sure the container has an init process running as as the PID 1 in the container. Specifying an init process ensures the usual responsibilities of an init system, such as reaping zombie processes, are performed inside the created container.
       options: --init
     needs: draft-release
     steps:
       - uses: actions/checkout@v2
+      - name: setup
+        run: |
+          sudo apt update
+          sudo apt install -y docker
       - name: install and build 
         run: |
           tipi run cmake -S . -B build/linux -GNinja -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-cxx17-static.cmake -DCMAKE_BUILD_TYPE=Release
@@ -117,4 +123,8 @@ jobs:
       - name: Run tests
         run: |
           cd build/linux/ 
-          tipi run ctest --verbose
+          tipi run ctest --verbose -E test_docker
+      - name: Run docker tests
+        run: |          
+          cd build/linux/
+          tipi run ctest --verbose -R test_docker
