@@ -74,14 +74,12 @@ namespace goldilock::test {
     BOOST_REQUIRE(!fs::exists(wd));
     fs::create_directories(wd);
 
-
     // note: on windows we could test up to full 16bits length, but this is kinda overkill already
     for(size_t ret = 0; ret < 255; ret++) {
-      auto result = run_goldilock_command_in(wd, "--verbose", "--lockfile", "test.lock", "--" , "exit", std::to_string(ret));
-
+      auto result = run_goldilock_command_in(wd, "--lockfile", "test.lock", "--" , "exit", std::to_string(ret));
       std::cout<<"retrun code is "<<result.return_code<<" and expected is " <<ret<<std::endl;
       BOOST_REQUIRE(result.return_code == ret);
-    }     
+    }
   }
 
   // check the backing tool works as expected

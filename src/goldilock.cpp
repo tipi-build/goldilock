@@ -346,11 +346,9 @@ namespace tipi::goldilock
       if(!io.stopped()){
         io.stop();
       }
-    
       if(io_thread.joinable()) {
         io_thread.join();
       }
-
     };
 
     // note: declared here to not get out of scope before the end of program
@@ -546,7 +544,6 @@ namespace tipi::goldilock
       }
 
       goldilock_exit_code = (found_all_files) ? 0 : 1;
-
       timeout_timer.cancel();
 
       if(found_all_files) {
