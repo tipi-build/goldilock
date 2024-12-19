@@ -15,8 +15,32 @@ target_link_libraries(test_lib INTERFACE
   Boost::process 
   Boost::asio
   Boost::scope_exit
+  Boost::interprocess
   Threads::Threads
 )
+
+set(test_support_apps_source_files
+    "${CMAKE_CURRENT_LIST_DIR}/support_app_append_to_file.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/support_app_launcher.cpp"
+)
+
+# we use this to inject the information about where "test supporting executables"
+# that will be built at the same time as the tests will be located to avoid
+# to have to compute the paths to the applications in the test executable
+#
+# a daunting task especially on windows + msvc builds
+set(test_support_app_targets "GOLDILOCK_TEST_BUILD_APP__goldilock=$<TARGET_FILE:goldilock>")
+
+foreach(source_file IN LISTS test_support_apps_source_files)
+    get_filename_component(app_name ${source_file} NAME_WE) # without .cpp extension
+
+    add_executable(${app_name} "${source_file}" )
+    set_target_properties(${app_name} PROPERTIES OUTPUT_NAME ${app_name})
+    target_link_libraries(${app_name} goldilock::test_lib cxxopts libgoldilock-utils::libgoldilock-utils)
+
+    list(APPEND test_support_app_targets "GOLDILOCK_TEST_BUILD_APP__${app_name}=$<TARGET_FILE:${app_name}>")
+endforeach()
+
 
 function(add_goldilock_test test_name source_files)
     message("Registering test ${test_name} (${source_files})")
@@ -35,31 +59,21 @@ function(add_goldilock_test test_name source_files)
     set_property(TEST ${test_name} PROPERTY LABELS "ALL")
 
     if(NOT env_value STREQUAL "")
-        set_property(TEST ${test_name} PROPERTY ENVIRONMENT "GOLDILOCK_TEST_ROOT_DIRECTORY=${CMAKE_CURRENT_LIST_DIR};BOOST_TEST_LOG_LEVEL=all")
+        set_property(TEST ${test_name} PROPERTY ENVIRONMENT "GOLDILOCK_TEST_ROOT_DIRECTORY=${CMAKE_CURRENT_LIST_DIR};GOLDILOCK_TEST_LOG_LEVEL=all;${test_support_app_targets}")
     endif()
 
 endfunction()
 
 set(test_source_files
     "${CMAKE_CURRENT_LIST_DIR}/test_basics.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/test_signals_robustness.cpp"
 )
+
+if(NOT WIN32)
+    # there's no such thing as signals on windows
+    list(APPEND test_source_files "${CMAKE_CURRENT_LIST_DIR}/test_signals_robustness.cpp")
+endif()
 
 foreach(test_file IN LISTS test_source_files)
     get_filename_component(test_name ${test_file} NAME_WE) # without .cpp extension
     add_goldilock_test(${test_name} "${test_file}")    
-endforeach()
-
-
-set(test_support_apps_source_files
-    "${CMAKE_CURRENT_LIST_DIR}/support_app_append_to_file.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/support_app_launcher.cpp"
-)
-
-foreach(source_file IN LISTS test_support_apps_source_files)
-    get_filename_component(app_name ${source_file} NAME_WE) # without .cpp extension
-
-    add_executable(${app_name} "${source_file}" )
-    set_target_properties(${app_name} PROPERTIES OUTPUT_NAME ${app_name})
-    target_link_libraries(${app_name} goldilock::test_lib cxxopts libgoldilock-utils::libgoldilock-utils)
 endforeach()

@@ -2,6 +2,8 @@
 #include <boost/test/included/unit_test.hpp> 
 #include <boost/test/data/test_case.hpp>
 
+#include <boost/predef.h>
+
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
@@ -87,10 +89,11 @@ namespace goldilock::test {
   BOOST_AUTO_TEST_CASE(test_support_tools_support_app_append_to_file) {
     auto wd = get_goldilock_case_working_dir();
     fs::create_directories(wd);
+    std::cout << "test_support_tools_support_app_append_to_file\nWorkdir: " << wd << std::endl;
 
     fs::path test_file = wd / "test.txt";
     // 
-    auto support_app_append_to_file_bin = fs::current_path() / "test" / host_executable_name("support_app_append_to_file");
+    fs::path support_app_append_to_file_bin = get_executable_path_from_test_env("support_app_append_to_file");
 
     {
       auto result = run_cmd(bp::start_dir=wd, support_app_append_to_file_bin, "-s", "x", "-n", "10", "-f", test_file.generic_string(), "-i", "10"); // add 10x "x" to test.txt with 10ms interval
@@ -137,7 +140,7 @@ namespace goldilock::test {
     auto wd = get_goldilock_case_working_dir();
     fs::create_directories(wd);
 
-    const fs::path support_app_append_to_file_bin = fs::current_path() / "test" / host_executable_name("support_app_append_to_file");
+    const fs::path support_app_append_to_file_bin = get_executable_path_from_test_env("support_app_append_to_file");
     const std::string lockfile_name = "test.lock";
     const fs::path write_output_dest = wd / "test.txt";
 
@@ -168,7 +171,7 @@ namespace goldilock::test {
     auto wd = get_goldilock_case_working_dir();
     fs::create_directories(wd);
 
-    const fs::path support_app_append_to_file_bin = fs::current_path() / "test" / host_executable_name("support_app_append_to_file");
+    const fs::path support_app_append_to_file_bin = get_executable_path_from_test_env("support_app_append_to_file");
     const fs::path write_output_dest = wd / "test.txt";
 
     // Test a situation with multiple lockfiles
@@ -296,8 +299,10 @@ namespace goldilock::test {
 
     std::cout << "Working directory: " << wd << std::endl;
 
-    const std::string launcher_exe_name = host_executable_name("support_app_launcher");
-    const std::string support_app_launcher_bin = (fs::current_path() / "test" / launcher_exe_name).generic_string();
+
+    fs::path support_app_launcher_path = get_executable_path_from_test_env("support_app_launcher");
+    const std::string launcher_exe_name = support_app_launcher_path.filename().generic_string();
+    const std::string support_app_launcher_bin = support_app_launcher_path.generic_string();
 
     const std::string path_goldilock_watching_parent_lock_acquired_marker = (wd / "watcher_all_locks.marker").generic_string();
     const std::string path_goldilock_stage2_lock_acquired_marker = (wd / "stage2_all_locks.marker").generic_string();
@@ -346,7 +351,7 @@ namespace goldilock::test {
     launch_chain.push_back("--lock-success-marker");
     launch_chain.push_back(path_goldilock_watching_parent_lock_acquired_marker);
     launch_chain.push_back("--watch-parent-process");
-    launch_chain.push_back(launcher_exe_name);
+    launch_chain.push_back(support_app_launcher_path.stem().generic_string()); // search without .exe
     
     if(td_search_nearest) {
       std::cout << "Adding search nearest parameter to goldilock command" << std::endl;

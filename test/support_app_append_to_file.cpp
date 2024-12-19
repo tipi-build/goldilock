@@ -7,10 +7,13 @@
 #include <string>
 #include <thread>
 #include <boost/filesystem.hpp>
-
+#include <boost/interprocess/sync/file_lock.hpp>
+#include <boost/interprocess/sync/scoped_lock.hpp>
+#include <goldilock/file.hpp>
 #include <cxxopts.hpp>
 
 using namespace std::chrono_literals;
+using namespace std::string_literals;
 
 int main(int argc, char **argv)
 {
@@ -34,6 +37,10 @@ int main(int argc, char **argv)
     size_t max_failures = result["e"].as<size_t>();
     std::string filename = result["f"].as<std::string>();
     std::string fragment = result["s"].as<std::string>();
+
+    std::string lockfile = filename + ".lock"s;
+    tipi::goldilock::file::touch_file(lockfile);
+    boost::interprocess::file_lock flock(lockfile.data());       
     
     size_t times_success = 0;
     size_t failures = 0;
@@ -41,6 +48,7 @@ int main(int argc, char **argv)
     while(times_success < repeat) {
       try {
         {
+          boost::interprocess::scoped_lock<boost::interprocess::file_lock> e_lock(flock);
           std::ofstream outfile;
           outfile.open(filename, std::ios_base::app); 
           outfile << fragment;

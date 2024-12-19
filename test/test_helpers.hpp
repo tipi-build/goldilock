@@ -42,6 +42,22 @@ namespace goldilock::test {
     return result;
   }
 
+  inline std::string get_executable_path_from_test_env(const std::string& exec_name) {
+    std::string env_variable_name = "GOLDILOCK_TEST_BUILD_APP__"s + exec_name;
+    auto env_val = std::getenv(env_variable_name.data());
+    if(env_val == nullptr) {
+      throw std::runtime_error("You need to define the environment variable "s + env_variable_name + " to run this test");
+    }
+
+    fs::path exe_path{env_val};
+
+    if(!fs::exists(exe_path)) {
+      throw std::runtime_error("Test envirnment published executable not found at the expected path: " + exe_path.generic_string());
+    }
+    
+    return exe_path.generic_string();
+  }
+
   inline std::string host_executable_name(const std::string& exec_name) {
     #if BOOST_OS_WINDOWS
       return exec_name + ".exe"s;
@@ -56,13 +72,7 @@ namespace goldilock::test {
 
   //!\brief get the path to the goldilock executable in the build folder
   inline std::string host_goldilock_executable_path() {
-    fs::path goldilock_path = fs::current_path() / "src" / host_goldilock_executable_name();
-
-    if(!fs::exists(goldilock_path)) {
-      throw std::runtime_error("Goldilock executable not found at the expected path: " + goldilock_path.generic_string());
-    }
-    
-    return goldilock_path.generic_string();
+    return get_executable_path_from_test_env("goldilock");
   }
 
   inline fs::path get_goldilock_case_working_dir(const std::optional<fs::path>& working_directory = std::nullopt) {

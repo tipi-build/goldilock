@@ -6,15 +6,16 @@
 #include <fstream>
 #include <string>
 #include <thread>
+
 #include <boost/filesystem.hpp>
 #include <boost/process.hpp>
 #include <boost/process/handles.hpp>
 #include <boost/process/extend.hpp>
-#include <boost/asio/detail/signal_init.hpp>
-#include <boost/asio.hpp>
 #if BOOST_OS_WINDOWS
 #include <boost/winapi/process.hpp>
 #endif
+#include <boost/asio/detail/signal_init.hpp>
+#include <boost/asio.hpp>
 
 #if BOOST_OS_LINUX || BOOST_OS_MACOS
 #include <syslog.h>
@@ -83,6 +84,8 @@ int main(int argc, char **argv)
 
     // should we deamonize?
     if(deamonize) {
+
+      #if BOOST_OS_LINUX || BOOST_OS_MACOS
 
       // Note on why we don't do this all the time:
       // we are using support_app_launcher to simulate goldilock watching *some* parent process so we need
@@ -182,6 +185,57 @@ int main(int argc, char **argv)
       // The io_context can now be used normally.
       syslog(LOG_INFO | LOG_USER, "Daemonized sucessfully");
       std::cout << "Daemonized sucessfully" << std::endl;
+
+      #elif BOOST_OS_WINDOWS
+
+      std::vector<std::string> original_argv(argv, argv + argc);
+      std::vector<std::string> daemonized_argv{};
+
+      bool copy_if_cond_found_daemonized_flag = false;
+      bool copy_if_conf_found_forwardAll = false;
+
+      std::copy_if(
+        original_argv.begin(),
+        original_argv.end(), 
+        std::back_inserter(daemonized_argv),
+        [&](const std::string& arg) {
+          // after the first -- we're alway good
+          if(copy_if_conf_found_forwardAll) {
+            return true;
+          }
+
+          // we're not forwarding this
+          if(!copy_if_cond_found_daemonized_flag && (arg == "-d" || arg == "--daemonize")) {
+            copy_if_cond_found_daemonized_flag = true;
+            return false;   
+          }
+
+          if(arg == "--") {
+            copy_if_conf_found_forwardAll = true;
+          }
+
+          return true;
+        });
+
+      bp::child child_process{
+        daemonized_argv,
+        #if BOOST_OS_WINDOWS
+        new_window_handler(),
+        #endif
+        bp::std_out > bp::null, 
+        bp::std_err > bp::null,
+        bp::std_in < bp::null,
+        bp::limit_handles,
+        bp::start_dir=child_launch_workdir  // this preserves the workdir as it was passed to the initial parent process (pre-daemonization)
+      };
+
+      child_process.detach();
+      return 0;
+
+
+      #else
+      #  error support_app_launcher does not contain daemonizing code for this platform
+      #endif
     }
 
     if(pidfile.has_value()) {
@@ -245,7 +299,9 @@ int main(int argc, char **argv)
     io_context.run();
 
     if(deamonize) {
+      #if BOOST_OS_LINUX || BOOST_OS_MACOS
       syslog(LOG_INFO | LOG_USER, "Quitting");
+      #endif
     }
   }
   catch (const std::exception &exc)
