@@ -42,20 +42,24 @@ namespace goldilock::test {
     return result;
   }
 
-  inline std::string get_executable_path_from_test_env(const std::string& exec_name) {
-    std::string env_variable_name = "GOLDILOCK_TEST_BUILD_APP__"s + exec_name;
-    auto env_val = std::getenv(env_variable_name.data());
+  inline std::string get_string_from_env(std::string variable_name) {
+    auto env_val = std::getenv(variable_name.data());
     if(env_val == nullptr) {
-      throw std::runtime_error("You need to define the environment variable "s + env_variable_name + " to run this test");
+      throw std::runtime_error("You need to define the environment variable "s + variable_name + " to run this test");
     }
 
-    fs::path exe_path{env_val};
+    return std::string{env_val};
+  }
+
+  inline std::string get_executable_path_from_test_env(const std::string& exec_name) {
+    std::string env_variable_name = "GOLDILOCK_TEST_BUILD_APP__"s + exec_name;
+    fs::path exe_path{get_string_from_env(env_variable_name)};
 
     if(!fs::exists(exe_path)) {
       throw std::runtime_error("Test envirnment published executable not found at the expected path: " + exe_path.generic_string());
     }
     
-    return exe_path.generic_string();
+    return exe_path.generic_path().generic_string();
   }
 
   inline std::string host_executable_name(const std::string& exec_name) {

@@ -66,6 +66,7 @@ endfunction()
 
 set(test_source_files
     "${CMAKE_CURRENT_LIST_DIR}/test_basics.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/test_docker.cpp"
 )
 
 if(NOT WIN32)
