@@ -343,18 +343,13 @@ namespace tipi::goldilock
     });
 
     auto clean_stop_io = [&io_thread, &io]() {
-      std::cout<<"clean_stop_io 1"<<std::endl;
-      if(!io.stopped()){io.stop();}
-     
-      std::cout<<"clean_stop_io 2"<<std::endl;
-
-      if(io_thread.joinable()) {
-      std::cout<<"clean_stop_io 2.1"<<std::endl;
-        io_thread.join();
-      std::cout<<"clean_stop_io 2.2"<<std::endl;
-
+      if(!io.stopped()){
+        io.stop();
       }
-      std::cout<<"clean_stop_io 3"<<std::endl;
+    
+      if(io_thread.joinable()) {
+        io_thread.join();
+      }
 
     };
 
@@ -524,7 +519,6 @@ namespace tipi::goldilock
       }
       
       goldilock_exit_code = child_process->exit_code();
-      std::cout<<"goldilock_exit_code was set with exit code "<<goldilock_exit_code<<std::endl;
     }
     // ...or wather for unlock files to appear
     else {
@@ -564,25 +558,13 @@ namespace tipi::goldilock
     }
     
     // shutdown everything
-    std::cout<<"goldilock 0"<<std::endl;
     exit_requested = true;
-    std::cout<<"goldilock 1"<<std::endl;
     //hold_lock_timer.cancel();
-    std::cout<<"goldilock 2"<<std::endl;
     //watch_parent_timer.cancel();
-    std::cout<<"goldilock 3"<<std::endl;
     //signals.cancel();
-    std::cout<<"goldilock 4"<<std::endl;
     //spots.clear();
-    std::cout<<"goldilock 5"<<std::endl;
     //file_locks.clear();
-    std::cout<<"goldilock 6"<<std::endl;
     clean_stop_io();
-    std::cout<<"goldilock 7"<<std::endl;
-
-
-    std::cout<<"goldilock_exit_code returns "<<goldilock_exit_code<<std::endl;
-
     return goldilock_exit_code;
   }
   
