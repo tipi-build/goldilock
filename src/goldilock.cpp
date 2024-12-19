@@ -343,9 +343,8 @@ namespace tipi::goldilock
     });
 
     auto clean_stop_io = [&io_thread, &io]() {
-      if(!io.stopped()){
-        io.stop();
-      }
+      io.stop();
+      
       if(io_thread.joinable()) {
         io_thread.join();
       }
