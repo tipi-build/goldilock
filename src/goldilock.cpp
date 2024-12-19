@@ -559,9 +559,9 @@ namespace tipi::goldilock
     
     // shutdown everything
     exit_requested = true;
-    //hold_lock_timer.cancel();
-    //watch_parent_timer.cancel();
-    //signals.cancel();
+    hold_lock_timer.cancel();
+    watch_parent_timer.cancel();
+    signals.cancel();
     //spots.clear();
     //file_locks.clear();
     clean_stop_io();
