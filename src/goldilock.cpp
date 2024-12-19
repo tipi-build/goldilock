@@ -97,6 +97,7 @@ namespace tipi::goldilock
       show_version = cli_result.count("version") > 0;
 
       if(show_help || show_version) {
+        valid_cli = true;
         return;
       }
 
@@ -253,6 +254,10 @@ namespace tipi::goldilock
         }
       }
 
+      #if BOOST_OS_LINUX
+      signal(SIGCHLD, SIG_IGN); // we don't want to handle child signals from our deteched goldilock to avoid them handing around as zombies
+      #endif
+
       auto child_process = shell_run(cmd_ss.str(),
         #if BOOST_OS_WINDOWS
         new_window_handler(),
@@ -286,12 +291,6 @@ namespace tipi::goldilock
       return child_ret.value_or(1); // only success if the child returned 0 too
     }
 
-    auto touch_file = [](const std::string& path) {
-      std::fstream ofs(path, std::ios::out | std::ios::trunc | std::ios::in | std::ios::binary);
-      ofs.close();
-    };
-
-
     //
     // normal operations 
     //
@@ -311,7 +310,7 @@ namespace tipi::goldilock
         
         // make sure the lock file exits to start with
         std::string lockfile_str = lockfile.generic_string();
-        touch_file(lockfile_str);
+        goldilock::file::touch_file(lockfile_str);
         file_locks.emplace(lockfile, lockfile_str.data());
 
       }
@@ -324,11 +323,17 @@ namespace tipi::goldilock
     // handle signals and deal with any running child process in that case
     boost::asio::signal_set signals(io, SIGINT, SIGTERM);
     signals.async_wait(
-      [&child_process, &exit_requested](boost::system::error_code error, int signal_number) { 
+      [&child_process, &exit_requested, &log](boost::system::error_code error, int signal_number) { 
         exit_requested = true;
 
         if(child_process.has_value() && child_process->joinable()) {
-          child_process->terminate();
+          try {
+            child_process->terminate();
+          }
+          catch(...) {
+            // it could be that the child received that signal already in which case we're done
+            log <<  "Error while waiting on child process - possibly terminated by signal" << std::endl;
+          }          
         }
       }
     );
@@ -423,7 +428,7 @@ namespace tipi::goldilock
 
         for(auto& [target, spot] : spots) {
           spot.update_spot();
-        }  
+        }
 
         // schedule next interval
         hold_lock_timer.expires_after(2s);
@@ -491,7 +496,7 @@ namespace tipi::goldilock
 
     if(options.should_write_success_markers()) {
       for(const auto& marker : options.success_markers) {
-        touch_file(marker);
+        goldilock::file::touch_file(marker);
       }
     }    
 
@@ -502,9 +507,15 @@ namespace tipi::goldilock
       
       // setup the child process (wire up all i/o as passthrough)
       child_process = shell_run(io, options.command_mode_cmd, bp::std_out > stdout,  bp::std_err > stderr, bp::std_in < stdin);
-      child_process->wait();
-      goldilock_exit_code = child_process->exit_code();
 
+      try {
+        child_process->wait();
+      }
+      catch(...) {
+        log <<  "Error while waiting on child process - possibly terminated by signal" << std::endl;
+      }
+      
+      goldilock_exit_code = child_process->exit_code();
     }
     // ...or wather for unlock files to appear
     else {
@@ -548,7 +559,6 @@ namespace tipi::goldilock
     watch_parent_timer.cancel();
     signals.cancel();
     clean_stop_io();
-
     return goldilock_exit_code;
   }
   
