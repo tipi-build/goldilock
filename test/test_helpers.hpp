@@ -18,10 +18,15 @@ namespace goldilock::test {
   namespace fs = boost::filesystem;
   namespace bp = boost::process;
   using namespace std::string_literals;
+  using namespace std::chrono_literals;
 
   struct run_cmd_result_t {
     std::string output;
     size_t return_code;
+
+    operator bool() const {
+        return return_code == 0;
+    }
   };
 
   /// @brief Wraps boost::process::system() and returns 
@@ -42,9 +47,13 @@ namespace goldilock::test {
     return result;
   }
 
-  inline std::string get_string_from_env(std::string variable_name) {
+  inline std::string get_string_from_env(std::string variable_name, std::optional<std::string> default_value = std::nullopt) {
     auto env_val = std::getenv(variable_name.data());
     if(env_val == nullptr) {
+      if(default_value.has_value()) {
+        return default_value.value();
+      }
+
       throw std::runtime_error("You need to define the environment variable "s + variable_name + " to run this test");
     }
 
@@ -156,5 +165,22 @@ namespace goldilock::test {
 
     return result;
   }
+
+  //!\brief wait for a file to apear
+  inline bool wait_for_file(const fs::path& path, size_t retries = 50, std::chrono::milliseconds retry_interval = 50ms) {
+    bool found_file = false;
+    while(--retries > 0) {
+      found_file = fs::exists(path); 
+      if(!found_file) {
+        std::this_thread::sleep_for(retry_interval);
+      }
+      else {
+        break;
+      }
+    }
+
+    return found_file;
+  }    
+
 
 }

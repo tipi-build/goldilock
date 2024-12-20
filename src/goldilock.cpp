@@ -59,9 +59,13 @@ namespace tipi::goldilock
       static fs::path shell_executable = boost::process::search_path("cmd.exe");
       static std::string shell_command_arg = "/c";
     #else
-      static fs::path shell_executable = boost::process::search_path("bash");
+      static fs::path shell_executable = boost::process::search_path( "sh" );
       static std::string shell_command_arg = "-c";
     #endif
+
+    if(shell_executable == "") {
+      throw std::runtime_error("Did not find default shell");
+    }
 
     return bp::child{shell_executable, shell_command_arg, args...};
   }
@@ -504,6 +508,8 @@ namespace tipi::goldilock
 
     // ...run the passed command
     if(options.run_command_mode) {
+
+      log << "(run_command_mode) Starting: " << options.command_mode_cmd << std::endl;
       
       // setup the child process (wire up all i/o as passthrough)
       child_process = shell_run(io, options.command_mode_cmd, bp::std_out > stdout,  bp::std_err > stderr, bp::std_in < stdin);

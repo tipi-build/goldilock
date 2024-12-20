@@ -32,22 +32,6 @@ namespace goldilock::test {
 
   using namespace std::literals;
 
-  //!\brief wait for a file to apear
-  inline bool wait_for_file(const fs::path& path, size_t retries = 50, std::chrono::milliseconds retry_interval = 50ms) {
-    bool found_file = false;
-    while(--retries > 0) {
-      found_file = fs::exists(path); 
-      if(!found_file) {
-        std::this_thread::sleep_for(retry_interval);
-      }
-      else {
-        break;
-      }
-    }
-
-    return found_file;
-  }    
-
   BOOST_AUTO_TEST_CASE(goldilock_help_returns_success) {    
     auto result = run_goldilock_command("--help");
     BOOST_REQUIRE(result.return_code == 0);

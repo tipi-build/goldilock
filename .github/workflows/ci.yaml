@@ -83,6 +83,7 @@ jobs:
           asset_content_type: application/zip
       - name: Run tests
         run: |
+
           cd build/macos/ 
           ctest --verbose -E test_docker
 
@@ -100,9 +101,9 @@ jobs:
       - uses: actions/checkout@v2
       - name: setup
         run: |
+
           sudo apt update
-          sudo apt-get install -y docker.io 
-          
+          sudo apt-get install -y docker.io           
 
           # the buildx plugin is available under either one of these names
           set +e
@@ -136,7 +137,13 @@ jobs:
           cd build/linux/ 
           tipi run ctest --verbose -E test_docker
       - name: Run docker tests
-        run: |          
+        run: |
+
+          # we will use this to be able to map the docker-in-docker paths between
+          # this environment and the containers the tests will run
+          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_CONTAINER=${{ github.workspace }}
+          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_HOST=${{ github.workspace }}
+
           cd build/linux/
           # ... we need priviledge to write to the docker socket
           sudo tipi run ctest --verbose -R test_docker
