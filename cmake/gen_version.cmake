@@ -2,7 +2,7 @@ find_package(Git)
 
 if(GIT_EXECUTABLE)
     execute_process(
-        COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty
+        COMMAND ${GIT_EXECUTABLE} describe --always --dirty
         WORKING_DIRECTORY ${WORKING_DIR}
         OUTPUT_VARIABLE GOLDILOCK_GIT_REVISION
         RESULT_VARIABLE ERROR_CODE
