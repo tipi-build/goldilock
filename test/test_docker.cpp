@@ -8,6 +8,7 @@
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/process.hpp>
 #include <boost/asio/detail/signal_init.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -48,19 +49,25 @@ namespace goldilock::test {
     return found_file;
   }
 
+  inline std::string docker_bin() {
+    static const std::string docker_path = bp::search_path(host_executable_name("docker")).generic_path().generic_string();
+    assert(docker_path != "");
+    return docker_path;
+  }
+
   inline std::string docker_container_status(const std::string& name) {
-    auto ret = run_cmd("docker inspect -f {{.State.Status}} "s + name);
+    auto ret = run_cmd(docker_bin(), "inspect -f {{.State.Status}} "s + name);
     return ret.output;
   }
 
   template <class... Param> 
   inline run_cmd_result_t run_docker_cmd(Param &&... args) {
 
-    std::cout << "Running docker command: '";
+    std::cout << "Running docker command: " << docker_bin();
     ((std::cout << ' ' << std::forward<Param>(args)), ...); 
-    std::cout << "'" << std::endl;
+    std::cout << std::endl;
 
-    auto result = goldilock::test::run_cmd(args...);
+    auto result = goldilock::test::run_cmd(docker_bin(), args...);
     
     if(result.return_code != 0) {
       std::cout << "Command output:\n" 
@@ -92,13 +99,14 @@ namespace goldilock::test {
 
     fs::copy(test_env_goldilock, context_goldilock_path);
 
-    auto docker_build_cmd = "docker build --tag "s + image_tag + " . "s;
+    std::vector<std::string> docker_build_cmd_args = { "build", "--tag", image_tag, "." };
 
     // just for docker build...
     bp::environment env = boost::this_process::environment();
     env["DOCKER_BUILDKIT"] = "1";
 
-    auto result = goldilock::test::run_cmd(env, bp::start_dir=context_root, docker_build_cmd);
+    std::cout << "Running docker command: " << docker_bin() << boost::algorithm::join(docker_build_cmd_args, " ") << std::endl;
+    auto result = goldilock::test::run_cmd(env, bp::start_dir=context_root, docker_bin(), docker_build_cmd_args);
 
     if(result.return_code != 0) {
       std::cout << "Command output:\n" 
@@ -112,12 +120,9 @@ namespace goldilock::test {
   }
 
   bool stop_container(const std::string& id) {      
-    std::string cmd = "docker stop "s + id;
-    std::cout << "Running " << cmd << std::endl;
-    auto result = run_cmd(cmd);
+    auto result = run_docker_cmd("stop", id);
 
     if(result.return_code != 0) {
-      std::cerr << "docker command failed with output:\n-----------------\n" << result.output << "\n-----------------" << std::endl;
       throw std::runtime_error("docker stop failed");
     }
 
@@ -125,12 +130,9 @@ namespace goldilock::test {
   }
   
   bool rm_container(const std::string& id) {
-    std::string cmd = "docker rm "s + id;
-    std::cout << "Running " << cmd << std::endl;
-    auto result = run_cmd(cmd);
+    auto result = run_docker_cmd("rm", id);
 
     if(result.return_code != 0) {
-      std::cerr << "docker command failed with output:\n-----------------\n" << result.output << "\n-----------------" << std::endl;
       throw std::runtime_error("docker stop failed");
     }
 
@@ -158,12 +160,12 @@ namespace goldilock::test {
     //inline 
   };
 
-  inline std::string start_container(const std::string& additiona_params = "", const std::string& command = "sleep infinity") {
-    std::string start_cmd = "docker run -d " + additiona_params + " "s + goldilock_minimal_image_tag + " \"" + command + "\"";
-    auto result = run_docker_cmd(start_cmd);
+  template <class... Param> 
+  inline std::string start_container(const std::string& command = "sleep infinity", Param &&... args) {
+    auto result = run_docker_cmd("run", "-d", args..., goldilock_minimal_image_tag, command);
 
     if(result.return_code != 0) {
-      throw std::runtime_error("docker run failed");
+      throw std::runtime_error("docker failed to start container");
     }
 
     // this is a global...
@@ -176,14 +178,20 @@ namespace goldilock::test {
 
   BOOST_AUTO_TEST_CASE(goldilock_version_returns_success) {
     auto id = start_container();
-    auto result = run_docker_cmd("docker exec "s + id + " goldilock --version"s);
+    auto result = run_docker_cmd("exec", id, "/usr/bin/goldilock", "--version"s);
     BOOST_REQUIRE(result.return_code == 0);
     BOOST_REQUIRE(boost::regex_search(result.output, boost::regex{"goldilock v([\\d]+\\.[\\d]+\\.[\\d]+) \\(built from [\\w]{7}(?:-dirty)?\\)"}));
+
+
+    // verify we're actually running the expected version inside the container
+    auto host_run_result = run_goldilock_command("--version");
+    BOOST_REQUIRE(host_run_result.return_code == 0);
+    BOOST_REQUIRE(host_run_result.output == result.output);
   }
 
   BOOST_AUTO_TEST_CASE(goldilock_help_returns_success) {
     auto id = start_container();
-    auto result = run_docker_cmd("docker exec "s + id + " goldilock --help"s);
+    auto result = run_docker_cmd("exec", id, "/usr/bin/goldilock", "--help"s);
     BOOST_REQUIRE(result.return_code == 0);
     std::cout << "goldilock help:\n------------\n" << result.output << "\n------------" << std::endl;
   }

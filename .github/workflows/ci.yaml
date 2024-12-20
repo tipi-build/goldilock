@@ -93,7 +93,7 @@ jobs:
       image: tipibuild/tipi-ubuntu:latest
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
-      # make sure the container has an init process running as as the PID 1 in the container. Specifying an init process ensures the usual responsibilities of an init system, such as reaping zombie processes, are performed inside the created container.
+      # --init makes sure the container has an init process running as as the PID 1 in the container. Specifying an init process ensures the usual responsibilities of an init system, such as reaping zombie processes, are performed inside the created container.
       options: --init
     needs: draft-release
     steps:
@@ -101,7 +101,18 @@ jobs:
       - name: setup
         run: |
           sudo apt update
-          sudo apt install -y docker
+          sudo apt-get install -y docker.io 
+          
+
+          # the buildx plugin is available under either one of these names
+          set +e
+          sudo apt-get install -y docker-buildx 
+          sudo apt-get install -y docker-buildx-plugin
+          set -e
+
+          sudo docker --version
+          sudo docker buildx version
+          
       - name: install and build 
         run: |
           tipi run cmake -S . -B build/linux -GNinja -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-cxx17-static.cmake -DCMAKE_BUILD_TYPE=Release
@@ -127,4 +138,5 @@ jobs:
       - name: Run docker tests
         run: |          
           cd build/linux/
-          tipi run ctest --verbose -R test_docker
+          # ... we need priviledge to write to the docker socket
+          sudo tipi run ctest --verbose -R test_docker
