@@ -10,16 +10,6 @@
 #include <string>
 #include <boost/filesystem.hpp>
 
-#if BOOST_OS_LINUX
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
-#elif BOOST_OS_WINDOWS
-#error No impl yet
-#endif
-
-
 namespace tipi::goldilock::file {
   using namespace std::string_literals;
   namespace fs = boost::filesystem;
@@ -45,14 +35,12 @@ namespace tipi::goldilock::file {
     return read_file_content(filename.generic_string());
   }
 
-  //
-  //
   inline void touch_file(const boost::filesystem::path& path) {
     std::fstream ofs(path.generic_string(), std::ios::out | std::ios::trunc | std::ios::in | std::ios::binary);
     ofs.close();
   }
 
-
+  //!\brief same as touch_file() except the files get chmod-ed 666 so that multiple users can share the file
   inline void touch_file_permissive(const boost::filesystem::path& path) {
     bool set_perms = !fs::exists(path);
 
@@ -64,39 +52,11 @@ namespace tipi::goldilock::file {
         fs::permissions(path, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write);
       }
       catch(...) {
-        //
+        // we *might* get to the seldom case that someones else (re)created the file in beween us touching it and
+        // thus has the ownership.
       }      
     }
     
     ofs.close();
-    
-    /*
-    // note: saving for later
-    #if BOOST_OS_LINUX
-    ssize_t nrd;
-    int fd;
-    
-    
-    fd = open(path.generic_string().data(), O_CREAT | O_WRONLY | O_TRUNC);
-
-    // file mode 0666 / r/w for everyone 
-    // note: a well timed crash could still result in us creating the file
-    // before chmodding it but this is probaby less of an issue than to have
-    // M/T issues with umask()-ing before + after calls to open(), especially
-    // as goldilock is not single threaded
-    fchmod(fd,  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-    
-    if (fd == -1) {
-      throw std::runtime_error("Error opening file: "s + strerror(errno));
-    }
-
-    if (close(fd) == -1) {
-      throw std::runtime_error("Error opening file: "s + strerror(errno));
-    }
-    #elif BOOST_OS_WINDOWS
-    // todo
-    #else
-    # error No implementation of touch_file_permissive() for this O/S
-    #endif*/
   }
 }
