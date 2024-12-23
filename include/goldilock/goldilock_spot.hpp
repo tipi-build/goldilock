@@ -115,7 +115,7 @@ namespace tipi::goldilock {
         fs::path spot_path = get_spot_path();
 
         {
-          auto lockfile_stream = exclusive_fstream::open(spot_path, "wx");
+          auto lockfile_stream = exclusive_fstream::open(spot_path, "w");
           if(lockfile_stream.is_open()) {
             boost::archive::text_oarchive oa(lockfile_stream);
             oa << *this;

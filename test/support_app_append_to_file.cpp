@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     std::string fragment = result["s"].as<std::string>();
 
     std::string lockfile = filename + ".lock"s;
-    tipi::goldilock::file::touch_file(lockfile);
+    tipi::goldilock::file::touch_file_permissive(lockfile);
     boost::interprocess::file_lock flock(lockfile.data());       
     
     size_t times_success = 0;

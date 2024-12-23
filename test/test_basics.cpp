@@ -62,9 +62,11 @@ namespace goldilock::test {
     BOOST_REQUIRE(!fs::exists(wd));
     fs::create_directories(wd);
 
+    const std::string support_app_exiter_bin = get_executable_path_from_test_env("support_app_exiter");
+
     // note: on windows we could test up to full 16bits length, but this is kinda overkill already
     for(size_t ret = 0; ret < 255; ret++) {
-      auto result = run_goldilock_command_in(wd, "--lockfile", "test.lock", "--" , "exit", std::to_string(ret));
+      auto result = run_goldilock_command_in(wd, "--verbose", "--lockfile", "test.lock", "--" , support_app_exiter_bin, "--return-code", std::to_string(ret));
       BOOST_REQUIRE_EQUAL(result.return_code, ret);
     }
   }
@@ -288,6 +290,9 @@ namespace goldilock::test {
     const std::string launcher_exe_name = support_app_launcher_path.filename().generic_string();
     const std::string support_app_launcher_bin = support_app_launcher_path.generic_string();
 
+    fs::path support_app_exiter_path = get_executable_path_from_test_env("support_app_exiter");
+    const std::string support_app_exiter_bin = support_app_exiter_path.generic_string();
+
     const std::string path_goldilock_watching_parent_lock_acquired_marker = (wd / "watcher_all_locks.marker").generic_string();
     const std::string path_goldilock_stage2_lock_acquired_marker = (wd / "stage2_all_locks.marker").generic_string();
     const std::string lockfile = (wd / "lockfile").generic_string();
@@ -387,7 +392,7 @@ namespace goldilock::test {
 
     std::thread t_stage2([&](){ 
       BOOST_REQUIRE(expected_stage2_to_return == false);
-      auto result = run_goldilock_command_in(wd, "--lockfile", lockfile, "--lock-success-marker", path_goldilock_stage2_lock_acquired_marker, "--", "exit", "0");
+      auto result = run_goldilock_command_in(wd, "--lockfile", lockfile, "--lock-success-marker", path_goldilock_stage2_lock_acquired_marker, "--", support_app_exiter_bin, "--return-code", "0");
       BOOST_REQUIRE(result.return_code == 0);
       BOOST_REQUIRE(expected_stage2_to_return == true);      
     });
