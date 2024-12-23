@@ -260,7 +260,9 @@ namespace goldilock::test {
       run_volume_mount_check(container_3_id);
 
       // now we're expecting that the volume_mount_test_file contains all three container ids in a particular order!
-      BOOST_REQUIRE(tipi::goldilock::file::read_file_content(volume_mount_test_file_host_path) == (container_1_id + container_2_id + container_3_id));
+      auto file_content = tipi::goldilock::file::read_file_content(volume_mount_test_file_host_path);
+      std::cout << "Contents of volume_mount_test_file_host_path:\n-------------\n" << file_content << "\n-------------" << std::endl;
+      BOOST_REQUIRE(file_content == (container_1_id + container_2_id + container_3_id));
     }
 
     // the actual test of goldilock

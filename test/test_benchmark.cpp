@@ -86,7 +86,7 @@ namespace goldilock::test {
       child_processes.emplace_back(
         host_goldilock_executable_path(), "--lockfile", gl_A_lockfile, "--lockfile", gl_B_lockfile, "--", support_app_append_to_file_bin, "-s", std::to_string(task_ix) + ":"s, "-n", "5", "-f", write_output_dest.generic_string(), "-i", "1" ,      
         ios, bp::start_dir=wd, (bp::std_out & bp::std_err) > *fut_ptr, bp::std_in < bp::null,
-        bp::on_exit=[task_ix=task_ix, &tasks_done, bench_start=bench_start, &fut_ptr](int exit_code, std::error_code const& ec) {
+        bp::on_exit=[task_ix=task_ix, &tasks_done, bench_start, &fut_ptr](int exit_code, std::error_code const& ec) {
           std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
           std::cout << "Task " << task_ix << " returned with code: " << exit_code << " (after " << std::chrono::duration_cast<std::chrono::milliseconds>(now - bench_start).count() << "ms)" << std::endl;
           
@@ -101,8 +101,13 @@ namespace goldilock::test {
           tasks_done++;
         }        
       );
+
+      // don't start them too quickly to not overwhelm the os
+      std::this_thread::sleep_for(50ms);
     }
 
+    // now's the real starting point....
+    bench_start = std::chrono::steady_clock::now();
     tipi::goldilock::file::touch_file_permissive(master_unlockfile);
     std::chrono::steady_clock::time_point bench_expiry = std::chrono::steady_clock::now() + 180s;
 
