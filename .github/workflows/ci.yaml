@@ -101,7 +101,6 @@ jobs:
       - uses: actions/checkout@v2
       - name: setup
         run: |
-
           sudo apt update
           sudo apt-get install -y docker.io           
 
@@ -141,9 +140,15 @@ jobs:
 
           # we will use this to be able to map the docker-in-docker paths between
           # this environment and the containers the tests will run
-          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_CONTAINER=${{ github.workspace }}
-          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_HOST=${{ github.workspace }}
+          export SHARE_VOLUME_FOLDER=_dind_shared_volume
+          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_CONTAINER=${{ github.workspace }}/$SHARE_VOLUME_FOLDER
+          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_HOST=${{ github.workspace }}/$SHARE_VOLUME_FOLDER
+          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST=$(pwd)/$SHARE_VOLUME_FOLDER          
+          
+          # create the folder from the test environmnent's perspective: 
+          mkdir -p $GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST
+          echo "hello" > $GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST/test_from_ci_yaml
 
           cd build/linux/
           # ... we need priviledge to write to the docker socket
-          sudo tipi run ctest --verbose -R test_docker
+          sudo --preserve-env tipi run ctest --verbose -R test_docker
