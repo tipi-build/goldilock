@@ -57,12 +57,7 @@ namespace goldilock::test {
     std::cout << "Test case working dir: " << wd << std::endl;
 
     static std::string success_marker_path = (wd / "success.marker").generic_string();
-
-    #if BOOST_OS_WINDOWS
-      static std::string sleep_command = bp::search_path("timeout.exe").generic_string();
-    #else
-      static std::string sleep_command = bp::search_path("sleep").generic_string();
-    #endif
+    static std::string sleep_command = bp::search_path("sleep").generic_string();
 
     std::vector<std::string> command = {
       host_goldilock_executable_path(),
@@ -94,12 +89,11 @@ namespace goldilock::test {
       std::cout << "---------------------" << std::endl;
       std::chrono::steady_clock::time_point ts_attempt_begin = std::chrono::steady_clock::now();
       
-
       std::future<std::string> fut;
       bp::child child_process{command, ios, bp::start_dir=wd, (bp::std_out & bp::std_err) > fut, bp::std_in < stdin};
       
       while(!fs::exists(success_marker_path)) {
-        std::this_thread::sleep_for(50ms);
+        std::this_thread::sleep_for(10ms);
         std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
         if(std::chrono::duration_cast<std::chrono::seconds>(now - ts_attempt_begin).count() > 30) {
@@ -109,7 +103,7 @@ namespace goldilock::test {
 
       std::cout << "(test - sending signal to child process " << sig_name(td_signal) << " [" << td_signal << "])" << std::endl;
       kill(child_process.native_handle(), td_signal);
-  
+
       try {
         if(child_process.joinable()) {
           child_process.wait();
