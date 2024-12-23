@@ -67,14 +67,14 @@ namespace goldilock::test {
     boost::asio::io_context ios;
     boost::asio::io_service::work work(ios);
     boost::thread_group threads;
-    for (std::size_t i = 0; i < 16; ++i) {
+    for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i) {
       threads.create_thread([&ios]() {
         ios.run();
       });
     }
     
     const std::chrono::steady_clock::time_point bench_start = std::chrono::steady_clock::now();
-    const size_t tasks_expected = 100;
+    const size_t tasks_expected = std::thread::hardware_concurrency() * 4; // 8 exe's per core...
     std::atomic_size_t tasks_done = 0;
 
     std::vector<bp::child> child_processes;

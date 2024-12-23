@@ -13,6 +13,7 @@
 #include <boost/predef.h>
 #include <boost/filesystem.hpp>
 #include <boost/process.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/process/handles.hpp>
 #include <boost/scope_exit.hpp>
 #include <boost/thread/mutex.hpp>
