@@ -16,12 +16,14 @@ target_link_libraries(test_lib INTERFACE
   Boost::asio
   Boost::scope_exit
   Boost::interprocess
+  Boost::thread
   Threads::Threads
 )
 
 set(test_support_apps_source_files
     "${CMAKE_CURRENT_LIST_DIR}/support_app_append_to_file.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/support_app_launcher.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/support_app_exiter.cpp"
 )
 
 # we use this to inject the information about where "test supporting executables"
@@ -67,6 +69,7 @@ endfunction()
 set(test_source_files
     "${CMAKE_CURRENT_LIST_DIR}/test_basics.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/test_docker.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/test_benchmark.cpp"
 )
 
 if(NOT WIN32)
