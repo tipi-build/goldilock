@@ -24,7 +24,6 @@ namespace tipi::goldilock::exclusive_fstream
   {
     bool excl = [filename, mode] {
       std::unique_ptr<std::FILE, FILE_closer> fp(std::fopen(filename, mode.data()));      
-      fs::permissions(filename, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write);
       return !!fp;
     }();
     auto saveerr = errno;
@@ -32,6 +31,7 @@ namespace tipi::goldilock::exclusive_fstream
     std::fstream stream;
 
     if (excl) {
+      fs::permissions(filename, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write);
       stream.open(filename);
     }
     else {
