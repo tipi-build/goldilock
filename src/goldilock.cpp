@@ -145,7 +145,7 @@ namespace tipi::goldilock
         unlockfiles = cli_result["unlockfile"].as<std::vector<std::string>>();
       }
 
-      unlockfile_timeout = cli_result.count("no-timeout") > 0;
+      unlockfile_notimeout = cli_result.count("no-timeout") > 0;
       unlockfile_timeout = cli_result["timeout"].as<size_t>();  // has a default value - cf. above
 
       valid_cli = true;
