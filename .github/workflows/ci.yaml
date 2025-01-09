@@ -10,6 +10,8 @@ env:
 
 jobs:
   draft-release:
+    permissions:
+      contents: write
     name: Draft Release if develop branch
     runs-on: ubuntu-latest
     outputs:
@@ -34,6 +36,8 @@ jobs:
   build-macos:
     name: build-macos
     runs-on: macos-latest
+    permissions:  
+      contents: write
     needs: draft-release
     steps:
       - uses: actions/checkout@v2
@@ -61,6 +65,8 @@ jobs:
   build-macos-intel:
     name: build-macos-intel
     runs-on: macos-13
+    permissions:
+      contents: write
     needs: draft-release
     steps:
       - uses: actions/checkout@v2
@@ -90,6 +96,8 @@ jobs:
   build-linux:
     name: build-linux
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     container: 
       image: tipibuild/tipi-ubuntu:latest
       volumes:
