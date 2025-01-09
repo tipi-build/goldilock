@@ -11,8 +11,6 @@ add_executable(goldilock "${CMAKE_CURRENT_LIST_DIR}/goldilock.cpp" )
 set_target_properties(goldilock PROPERTIES OUTPUT_NAME goldilock)
 target_link_libraries(goldilock libgoldilock-utils cxxopts::cxxopts Boost::system Boost::filesystem Boost::regex Boost::lexical_cast Boost::process Boost::scope_exit Boost::asio Boost::uuid Boost::serialization Boost::interprocess)
 target_include_directories(goldilock PRIVATE ${CMAKE_BINARY_DIR}/generated_sources)
-install(TARGETS goldilock RUNTIME DESTINATION bin)
-
 add_dependencies(goldilock version_header)
 
 install(TARGETS goldilock RUNTIME DESTINATION bin)

@@ -14,15 +14,16 @@
 
 namespace tipi::goldilock::exclusive_fstream
 {
+  namespace fs = boost::filesystem;
 
   struct FILE_closer {
     void operator()(std::FILE *fp) const { std::fclose(fp); }
   };
 
-  inline std::fstream open(const char *filename, const std::string mode = "wx")
+  inline std::fstream open(const char *filename, const std::string mode = "w")
   {
     bool excl = [filename, mode] {
-      std::unique_ptr<std::FILE, FILE_closer> fp(std::fopen(filename, mode.data()));
+      std::unique_ptr<std::FILE, FILE_closer> fp(std::fopen(filename, mode.data()));      
       return !!fp;
     }();
     auto saveerr = errno;
@@ -30,6 +31,7 @@ namespace tipi::goldilock::exclusive_fstream
     std::fstream stream;
 
     if (excl) {
+      fs::permissions(filename, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write);
       stream.open(filename);
     }
     else {
@@ -40,11 +42,11 @@ namespace tipi::goldilock::exclusive_fstream
     return stream;
   }
 
-  inline std::fstream open(const std::string& filename, const std::string mode = "wx") {
+  inline std::fstream open(const std::string& filename, const std::string mode = "w") {
     return open(filename.data(), mode);
   }
 
-  inline std::fstream open(const boost::filesystem::path& filename, const std::string mode = "wx") {
+  inline std::fstream open(const boost::filesystem::path& filename, const std::string mode = "w") {
     return open(filename.generic_string(), mode);
   }
 }
