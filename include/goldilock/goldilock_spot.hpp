@@ -115,7 +115,7 @@ namespace tipi::goldilock {
         fs::path spot_path = get_spot_path();
 
         {
-          auto lockfile_stream = exclusive_fstream::open(spot_path, "wx");
+          auto lockfile_stream = exclusive_fstream::open(spot_path, "w");
           if(lockfile_stream.is_open()) {
             boost::archive::text_oarchive oa(lockfile_stream);
             oa << *this;
@@ -126,8 +126,8 @@ namespace tipi::goldilock {
 
         // now read and see if the contents are as expected
         {
-          auto read_back = goldilock_spot::read_from(spot_path, lockfile_);
-          got_spot = (read_back.get_guid() == get_guid() && read_back.get_timestamp() ==  get_timestamp());
+          auto read_back = goldilock_spot::try_read_from(spot_path, lockfile_);
+          got_spot = (read_back.has_value() && read_back->get_guid() == get_guid() && read_back->get_timestamp() ==  get_timestamp());
         }
 
         if(got_spot) {
@@ -170,6 +170,17 @@ namespace tipi::goldilock {
       result.owned_ = false;
       result.spot_index_ = extract_lockfile_spot_index(result.lockfile_, spot_on_disk).value();      
       return result;
+    }
+
+    static std::optional<goldilock_spot> try_read_from(const fs::path& spot_on_disk, const fs::path& lockfile_path) {
+      try {
+        return read_from(spot_on_disk, lockfile_path);
+      }
+      catch(...) {
+        //
+      }
+
+      return std::nullopt;
     }
 
     bool is_first_in_line() const {
@@ -280,18 +291,30 @@ namespace tipi::goldilock {
       if(locker_in_line.has_value()) {
 
         bool delete_spot = false;
+        bool read_success = false;
 
-        try {
-          auto spot = goldilock_spot::read_from(directory_entry.path(), lockfile_path);
-          delete_spot = spot.is_expired();
+        size_t read_retries = 0;
+        const size_t max_read_retries = 50;
 
-          if(!delete_spot) {
-            result.insert({ directory_entry.path(), spot });
+        while(!read_success && read_retries++ < max_read_retries) {
+
+          try {
+            auto spot = goldilock_spot::read_from(directory_entry.path(), lockfile_path);
+            read_success = true;
+            delete_spot = spot.is_expired();
+
+            if(!delete_spot) {
+              result.insert({ directory_entry.path(), spot });
+            }
           }
-        }
-        catch(...) {
-          std::cerr << "Warning - deleting broken lock spot:" << directory_entry.path() << std::endl;
+          catch(...) {
+            // this is not totally unexpected... we have a couple of retries to make sure we don't fail on transient states
+          }
+        }    
+
+        if(!read_success && read_retries >= max_read_retries) {
           delete_spot = true;
+          std::cerr << "Warning - deleting broken lock spot:" << directory_entry.path() << std::endl;
         }
 
         if(delete_spot) {

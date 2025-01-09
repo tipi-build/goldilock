@@ -270,7 +270,13 @@ namespace tipi::goldilock::process_info {
     std::optional<pid_t> match = std::nullopt;
 
     for(const auto& pi : proc_stack) {
-      for(const auto& needle : process_names) {
+      for(const auto& needle_raw : process_names) {
+        #if BOOST_OS_LINUX || BOOST_OS_MACOS
+        std::string needle = needle_raw.substr(0, 15);  // kernel truncates at 15 chars
+        #else
+        std::string needle = needle_raw;
+        #endif
+
         if(tipi::goldilock::string::iequals(pi.name, needle)) {
           match = pi.pid;
           break;

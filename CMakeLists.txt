@@ -8,6 +8,7 @@ project(goldilock
   VERSION "1.1.0"
   LANGUAGES CXX
 )
+
 enable_testing()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -26,7 +27,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(cxxopts)
-set(BOOST_INCLUDE_LIBRARIES system filesystem regex lexical_cast process scope_exit uuid interprocess serialization)
+set(BOOST_INCLUDE_LIBRARIES system filesystem regex lexical_cast process scope_exit uuid interprocess serialization exception test)
 FetchContent_Declare(
   boost
   GIT_REPOSITORY https://github.com/tipi-build/boost
@@ -46,3 +47,4 @@ target_include_directories(libgoldilock-utils INTERFACE
 )
 
 add_subdirectory(src)
+add_subdirectory(test)
