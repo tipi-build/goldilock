@@ -236,7 +236,7 @@ namespace tipi::goldilock
     //
     // once the lock is acquired we return sucessfull from here
     if (options.detach) {
-      auto temp_file = boost::filesystem::unique_path(); // this is our success marker
+      auto temp_file = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path(); // this is our success marker
       fs::remove(temp_file); // make sure it's gone
 
       std::vector<std::string> detached_cmd;
@@ -284,8 +284,13 @@ namespace tipi::goldilock
         }        
       }
 
-      if(child_process.running() && marker_appeared) {
+      if(child_process.running()) {
         child_process.detach();
+      }
+
+      marker_appeared = fs::exists(temp_file);
+
+      if(marker_appeared) {
         fs::remove(temp_file);
         return 0;
       }
