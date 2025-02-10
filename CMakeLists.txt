@@ -9,8 +9,6 @@ project(goldilock
   LANGUAGES CXX
 )
 
-enable_testing()
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -47,4 +45,10 @@ target_include_directories(libgoldilock-utils INTERFACE
 )
 
 add_subdirectory(src)
-add_subdirectory(test)
+
+# BUILD_TESTING is CTest module's default, but we prefer it OFF by default
+# Instead of include(CTest) we check on the option ourselves.
+if (BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(test)
+endif()
