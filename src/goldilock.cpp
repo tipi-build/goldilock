@@ -17,6 +17,7 @@
 #include <boost/process/handles.hpp>
 #include <boost/scope_exit.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/exception/diagnostic_information.hpp> 
 #if BOOST_OS_WINDOWS
 #include <boost/winapi/process.hpp>
 #endif
@@ -321,7 +322,17 @@ namespace tipi::goldilock
           
           // make sure the lock file exits to start with
           std::string lockfile_str = lockfile.generic_string();
-          goldilock::file::touch_file_permissive(lockfile_str);
+
+          try {
+            goldilock::file::touch_file_permissive(lockfile_str);
+          }
+          catch(const std::exception& e) {
+            // in case noone else has created the file in the meantime its a real failure
+            if(!fs::exists(lockfile_str)) {
+              throw e;
+            }
+          }
+          
           file_locks.emplace(lockfile, lockfile_str.data());
 
         }
@@ -525,7 +536,15 @@ namespace tipi::goldilock
 
     if(options.should_write_success_markers()) {
       for(const auto& marker : options.success_markers) {
-        goldilock::file::touch_file_permissive(marker);
+        try {
+          goldilock::file::touch_file_permissive(marker);
+        }
+        catch(const std::exception& e) {
+          // in case noone else has created the file in the meantime its a real failure
+          if(!fs::exists(marker)) {
+            throw e;
+          }
+        }
       }
     }    
 
@@ -599,5 +618,13 @@ namespace tipi::goldilock
 
 int main(int argc, char **argv)
 {
-  return tipi::goldilock::goldilock_main(argc, argv);
+  try {
+    return tipi::goldilock::goldilock_main(argc, argv);
+  }
+  catch(...) {
+    std::cerr << "Unexpected failure in goldilock main:" << std::endl;
+    std::cerr << boost::current_exception_diagnostic_information() << std::endl;
+  }
+
+  return 42;  
 }

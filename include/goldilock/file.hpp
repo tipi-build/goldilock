@@ -36,7 +36,13 @@ namespace tipi::goldilock::file {
   }
 
   inline void touch_file(const boost::filesystem::path& path) {
+    // by testing if we can trunc it we'll know if we can write to it...
     std::fstream ofs(path.generic_string(), std::ios::out | std::ios::trunc | std::ios::in | std::ios::binary);
+
+    if(!ofs.is_open() || ofs.bad()) {
+      throw std::runtime_error("Failed to touch file '"s + path.generic_string() + "'"s);
+    }
+
     ofs.close();
   }
 
@@ -44,19 +50,13 @@ namespace tipi::goldilock::file {
   inline void touch_file_permissive(const boost::filesystem::path& path) {
     bool set_perms = !fs::exists(path);
 
-    // by testing if we can trunc it we'll know if we can write to it...
-    std::fstream ofs(path.generic_string(), std::ios::out | std::ios::trunc | std::ios::in | std::ios::binary);
-
-    if(set_perms) {
-      try {
-        fs::permissions(path, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write);
-      }
-      catch(...) {
-        // we *might* get to the seldom case that someones else (re)created the file in beween us touching it and
-        // thus has the ownership.
-      }      
-    }
+    touch_file(path);
     
-    ofs.close();
+    if(set_perms) {    
+      // we *might* get to the seldom case that someones else (re)created the file in beween us touching it and
+      // thus has the ownership.
+      boost::system::error_code ec;
+      fs::permissions(path, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write, ec);
+    }   
   }
 }
