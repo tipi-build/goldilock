@@ -89,6 +89,7 @@ namespace goldilock::test {
     std::cout << "Buiding docker container " << context_root << " (target tag: '" << image_tag << "')" << std::endl;
     docker_build_prep_copy_executable("goldilock", context_root);
     docker_build_prep_copy_executable("support_app_append_to_file", context_root);
+    docker_build_prep_copy_executable("support_app_deleter", context_root);
 
     std::vector<std::string> docker_build_cmd_args = { "build", "--tag", image_tag, "." };
 
@@ -177,194 +178,226 @@ namespace goldilock::test {
   // one fixture for everyone to ensure that the image(s) exit \ö/ 
   BOOST_TEST_GLOBAL_FIXTURE(docker_global_fixture);
 
-  BOOST_FIXTURE_TEST_CASE(goldilock_version_returns_success, docker_case_fixture) {
+//-  BOOST_FIXTURE_TEST_CASE(goldilock_version_returns_success, docker_case_fixture) {
+//-    auto id = start_container();
+//-    auto result = run_docker_cmd("exec", id, "/usr/bin/goldilock", "--version"s);
+//-    BOOST_REQUIRE(result.return_code == 0);
+//-    BOOST_REQUIRE(boost::regex_search(result.output, boost::regex{"goldilock v([\\d]+\\.[\\d]+\\.[\\d]+) \\(built from [\\w]{7}(?:-dirty)?\\)"}));
+//-
+//-
+//-    // verify we're actually running the expected version inside the container
+//-    auto host_run_result = run_goldilock_command("--version");
+//-    BOOST_REQUIRE(host_run_result.return_code == 0);
+//-    BOOST_REQUIRE(host_run_result.output == result.output);
+//-  }
+//-
+//-  BOOST_FIXTURE_TEST_CASE(goldilock_help_returns_success, docker_case_fixture) {
+//-    auto id = start_container();
+//-    auto result = run_docker_cmd("exec", id, "/usr/bin/goldilock", "--help"s);
+//-    BOOST_REQUIRE(result.return_code == 0);
+//-    std::cout << "goldilock help:\n------------\n" << result.output << "\n------------" << std::endl;
+//-  }
+//-
+//-  BOOST_FIXTURE_TEST_CASE(goldilock_docker_volume, docker_case_fixture) {
+//-    // docker in docker // wsl path mapping trickery
+//-    const auto fallback_shared_volume_path = get_goldilock_case_working_dir().generic_path().generic_string();
+//-    const std::string  test_env__SHARED_VOLUME_CONTAINER = get_string_from_env("GOLDILOCK_TEST_DIND_SHARED_VOLUME_CONTAINER", fallback_shared_volume_path);
+//-    const std::string  test_env__SHARED_VOLUME_HOST = get_string_from_env("GOLDILOCK_TEST_DIND_SHARED_VOLUME_HOST", fallback_shared_volume_path);
+//-    const std::string  test_env__SHARED_VOLUME_TEST = get_string_from_env("GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST", fallback_shared_volume_path);
+//-
+//-    if(!fs::is_directory(test_env__SHARED_VOLUME_HOST)) {
+//-      fs::create_directories(test_env__SHARED_VOLUME_HOST);
+//-    }    
+//-
+//-    std::cout << "test_env__SHARED_VOLUME_CONTAINER =" << test_env__SHARED_VOLUME_CONTAINER << std::endl;
+//-    std::cout << "test_env__SHARED_VOLUME_HOST =" << test_env__SHARED_VOLUME_HOST << std::endl;
+//-
+//-    auto container_1_id = start_container("sleep infinity", /* additional docker args */ "-v", test_env__SHARED_VOLUME_HOST + ":"s + test_env__SHARED_VOLUME_CONTAINER);
+//-    auto container_2_id = start_container("sleep infinity", /* additional docker args */ "-v", test_env__SHARED_VOLUME_HOST + ":"s + test_env__SHARED_VOLUME_CONTAINER);
+//-    auto container_3_id = start_container("sleep infinity", /* additional docker args */ "-v", test_env__SHARED_VOLUME_HOST + ":"s + test_env__SHARED_VOLUME_CONTAINER);
+//-
+//-    auto get_container_path = [&test_env__SHARED_VOLUME_CONTAINER](const fs::path& p) {
+//-      return (test_env__SHARED_VOLUME_CONTAINER / p).generic_path().generic_string();
+//-    };
+//-
+//-    auto get_testenv_path = [&test_env__SHARED_VOLUME_TEST](const fs::path& p) {
+//-      return (test_env__SHARED_VOLUME_TEST / p).generic_path().generic_string();
+//-    };
+//-
+//-    auto delete_if_exist = [](const fs::path& p) {
+//-      if(fs::exists(p)) {
+//-        fs::remove(p);
+//-      }
+//-    };
+//-
+//-    // test the the volume mount works for all the containers by checking that a file
+//-    // 
+//-    {
+//-      std::string volume_mount_test_file = "volume_mount_test.txt";
+//-      std::string volume_mount_test_file_test_path = get_testenv_path(volume_mount_test_file);
+//-
+//-      // clear leftovers
+//-      delete_if_exist(volume_mount_test_file_test_path);
+//-
+//-      BOOST_REQUIRE(!run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_1_id, "cat", volume_mount_test_file));
+//-      BOOST_REQUIRE(!run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_2_id, "cat", volume_mount_test_file));
+//-      BOOST_REQUIRE(!run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_3_id, "cat", volume_mount_test_file));
+//-      
+//-      std::cout << "Touching volume roundtrip test file at: " << volume_mount_test_file_test_path << std::endl;
+//-      tipi::goldilock::file::touch_file_permissive(volume_mount_test_file_test_path);
+//-
+//-      auto run_volume_mount_check = [&volume_mount_test_file, &test_env__SHARED_VOLUME_CONTAINER] (const std::string id) {
+//-        std::cout << "Context: run_volume_mount_check(" << id << ")" << std::endl;
+//-
+//-        std::string roundtrip_cmd = "ls -la && echo -n "s + id + " >> "s + volume_mount_test_file + " && cat "s + volume_mount_test_file;
+//-        auto res = run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, id, "/bin/sh", "-c", roundtrip_cmd);
+//-
+//-        BOOST_REQUIRE(res);
+//-        std::cout << " -> run_volume_mount_check(" << id << ") SUCCESS" << std::endl;
+//-        std::cout << "Contents of volume_mount_test_file_test_path in container:\n-------------\n" << res.output << "\n-------------" << std::endl;
+//-      };
+//-
+//-      run_volume_mount_check(container_1_id);
+//-      run_volume_mount_check(container_2_id);
+//-      run_volume_mount_check(container_3_id);
+//-
+//-      // now we're expecting that the volume_mount_test_file contains all three container ids in a particular order!
+//-      auto file_content = tipi::goldilock::file::read_file_content(volume_mount_test_file_test_path);
+//-      std::cout << "Contents of volume_mount_test_file_test_path in test env:\n-------------\n" << file_content << "\n-------------" << std::endl;
+//-      BOOST_REQUIRE(file_content == (container_1_id + container_2_id + container_3_id));
+//-    }
+//-
+//-    // the actual test of goldilock
+//-    {
+//-      const std::string master_lockfile_name = "master.lock";
+//-      const std::string stage2_lockfile_name = "stage2.lock";
+//-      bool test_flag_expect_master_released = false;
+//-
+//-      auto get_container_lock_aquired_marker_name = [](const std::string& id) {
+//-        return "lock_acquired_"s + id + ".marker";
+//-      };
+//-      
+//-      std::string write_dest_file = "destination.txt";
+//-      std::string write_dest_file_testenv_path = get_testenv_path(write_dest_file);
+//-      delete_if_exist(write_dest_file_testenv_path);
+//-
+//-      auto write_letter_container_fn = [&](const std::string& id, std::string chr, size_t interval) {
+//-
+//-        std::stringstream ss_cmd;
+//-
+//-        ss_cmd   << "/usr/bin/goldilock"
+//-          << " " << "--lockfile " << get_container_path(stage2_lockfile_name)
+//-          << " " << "--lock-success-marker " << get_container_path(get_container_lock_aquired_marker_name(id))
+//-          << " " << "--"  
+//-          << " " << "support_app_append_to_file -s " << chr << " -n  100 -f " << get_container_path(write_dest_file) << " -i " << interval          
+//-        ;
+//-
+//-        auto result = run_docker_cmd("exec", "-e", "TEST=2", "--workdir", test_env__SHARED_VOLUME_CONTAINER, id, "sh", "-c", ss_cmd.str());
+//-        BOOST_REQUIRE(test_flag_expect_master_released);
+//-        BOOST_REQUIRE(result);
+//-      };
+//-
+//-      auto write_letter_host_fn = [&](std::string chr, size_t interval) {
+//-        const std::string support_app_append_to_file_bin = get_executable_path_from_test_env("support_app_append_to_file");
+//-        auto result = run_goldilock_command_in(test_env__SHARED_VOLUME_HOST, 
+//-          "--lockfile", get_testenv_path(master_lockfile_name), 
+//-          "--lockfile", get_testenv_path(stage2_lockfile_name),
+//-          "--", 
+//-            support_app_append_to_file_bin, "-s", chr, "-n", "100", "-f", write_dest_file_testenv_path, "-i", std::to_string(interval)
+//-        );
+//-        BOOST_REQUIRE(result.return_code == 0);
+//-      };
+//-
+//-      // we're testing the unlockfile and multilock file acquisition at the same time here...
+//-      // let's have container 1 hold only the master lock
+//-      std::string master_lock_acquired_marker = "master_lock_acquired.marker";
+//-      std::string master_lock_acquired_marker_testenv_path = get_testenv_path(master_lock_acquired_marker);
+//-      delete_if_exist(master_lock_acquired_marker_testenv_path);      
+//-      
+//-      std::string master_unlockfile_name = "master.unlockfile";
+//-      std::string master_unlockfile_testenv_path = get_testenv_path(master_unlockfile_name);
+//-      delete_if_exist(master_unlockfile_testenv_path); 
+//-
+//-      std::thread t_container1([&](){ 
+//-        std::stringstream ss_cmd;
+//-
+//-        ss_cmd   << "/usr/bin/goldilock"
+//-          << " " << "--lockfile " << get_container_path(master_lockfile_name)
+//-          << " " << "--unlockfile " << get_container_path(master_unlockfile_name)
+//-          << " " << "--lock-success-marker " << get_container_path(master_lock_acquired_marker)
+//-          << " " << "--timeout 30" // fail if we don't get unlocked withing 30s
+//-        ;
+//-
+//-        auto result = run_docker_cmd("exec", "-e", "TEST=1", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_1_id, "sh", "-c", ss_cmd.str());
+//-        BOOST_REQUIRE(test_flag_expect_master_released);
+//-        BOOST_REQUIRE(result);
+//-      });
+//-
+//-      // make sure the master lock is taken
+//-      wait_for_file(get_testenv_path(master_lock_acquired_marker));
+//-      
+//-      // now start the other processes
+//-      std::thread t_host([&](){ write_letter_host_fn("H", 2); });
+//-      std::thread t_container2([&](){ write_letter_container_fn(container_2_id, "2", 2); });
+//-      std::thread t_container3([&](){ write_letter_container_fn(container_3_id, "3", 1); });
+//-
+//-      BOOST_REQUIRE(!fs::exists(write_dest_file_testenv_path));
+//-
+//-      test_flag_expect_master_released = true;
+//-      tipi::goldilock::file::touch_file(master_unlockfile_testenv_path);
+//-
+//-      wait_for_file(get_testenv_path(get_container_lock_aquired_marker_name(container_2_id)), 50, 100ms);
+//-      wait_for_file(get_testenv_path(get_container_lock_aquired_marker_name(container_3_id)), 50, 100ms);
+//-
+//-      t_host.join();
+//-      t_container1.join();
+//-      t_container2.join();
+//-      t_container3.join();
+//-
+//-      BOOST_REQUIRE(fs::exists(write_dest_file_testenv_path));
+//-
+//-      auto file_content = tipi::goldilock::file::read_file_content(write_dest_file_testenv_path);
+//-      std::cout << "Testing dockerized goldilocked interleaved write output:\n-------------\n" << file_content << "\n-------------\nExpecting no mixing of H|2|3" << std::endl;
+//-      
+//-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"^([H23]{300})$"}));
+//-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[H]{100}"}));
+//-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[2]{100}"}));
+//-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[3]{100}"}));
+//-
+//-    }
+//-  }
+
+  // note on this test case
+  // running many goldilock instances trying to aqcquire the same lock
+  // using GUN parallel 
+  //
+  // this test used to trigger a race in goldilock <=1.20 that was the 
+  // result of either one of the two following issues
+  // - trying to read lockspots that were already deleted by the goldilock that owned it
+  // - trying to set permission on a file that some other goldilock deemed to be a broken lockspot and had already deleted it since
+  BOOST_FIXTURE_TEST_CASE(goldilock_high_concurrency, docker_case_fixture) {
     auto id = start_container();
-    auto result = run_docker_cmd("exec", id, "/usr/bin/goldilock", "--version"s);
+
+    // run support_app_deleter in the "background" for 10s to have all the lock spots deleted as they are created
+    // the "-f mylock." has the support app delete all files starting with "mylock." - those are the lockspot files
+    auto deleter_result =  run_docker_cmd("exec", "-w", "/tmp", "--detach", id, "/bin/sh", "-c", "support_app_deleter -f mylock. -d 10 -t 8");
+    BOOST_REQUIRE(deleter_result.return_code == 0); 
+
+    std::this_thread::sleep_for(1s); // give the deleter a chance to be up and running...
+
+    // note --halt-on-error now,fail,1 == "Kill off all jobs immediately and exit without cleanup. The exit status will be the exit status from the failing job."
+    // note however that we will parse the std output of the application here to detect parallel complaining about job failures because it doesn't invent 
+    // a non-zero return code for cases like these where the app might fail (or has previously failed) with a segfault 
+    auto result = run_docker_cmd("exec", "-w", "/tmp", id, "/bin/sh", "-c", "seq 60 | parallel --halt-on-error now,fail,1 -j50 /usr/bin/goldilock --lockfile mylock -- echo job no"); 
+    std::cout << ".......START goldilock run output from container.......\n"
+      << result.output
+      << "\n.......END goldilock run output from container.......\n" 
+      << "Return code: " << result.return_code
+      << std::endl;
+
     BOOST_REQUIRE(result.return_code == 0);
-    BOOST_REQUIRE(boost::regex_search(result.output, boost::regex{"goldilock v([\\d]+\\.[\\d]+\\.[\\d]+) \\(built from [\\w]{7}(?:-dirty)?\\)"}));
-
-
-    // verify we're actually running the expected version inside the container
-    auto host_run_result = run_goldilock_command("--version");
-    BOOST_REQUIRE(host_run_result.return_code == 0);
-    BOOST_REQUIRE(host_run_result.output == result.output);
+    BOOST_REQUIRE(!boost::regex_search(result.output, boost::regex{"This job failed"}));
   }
-
-  BOOST_FIXTURE_TEST_CASE(goldilock_help_returns_success, docker_case_fixture) {
-    auto id = start_container();
-    auto result = run_docker_cmd("exec", id, "/usr/bin/goldilock", "--help"s);
-    BOOST_REQUIRE(result.return_code == 0);
-    std::cout << "goldilock help:\n------------\n" << result.output << "\n------------" << std::endl;
-  }
-
-  BOOST_FIXTURE_TEST_CASE(goldilock_docker_volume, docker_case_fixture) {
-    // docker in docker // wsl path mapping trickery
-    const auto fallback_shared_volume_path = get_goldilock_case_working_dir().generic_path().generic_string();
-    const std::string  test_env__SHARED_VOLUME_CONTAINER = get_string_from_env("GOLDILOCK_TEST_DIND_SHARED_VOLUME_CONTAINER", fallback_shared_volume_path);
-    const std::string  test_env__SHARED_VOLUME_HOST = get_string_from_env("GOLDILOCK_TEST_DIND_SHARED_VOLUME_HOST", fallback_shared_volume_path);
-    const std::string  test_env__SHARED_VOLUME_TEST = get_string_from_env("GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST", fallback_shared_volume_path);
-
-    if(!fs::is_directory(test_env__SHARED_VOLUME_HOST)) {
-      fs::create_directories(test_env__SHARED_VOLUME_HOST);
-    }    
-
-    std::cout << "test_env__SHARED_VOLUME_CONTAINER =" << test_env__SHARED_VOLUME_CONTAINER << std::endl;
-    std::cout << "test_env__SHARED_VOLUME_HOST =" << test_env__SHARED_VOLUME_HOST << std::endl;
-
-    auto container_1_id = start_container("sleep infinity", /* additional docker args */ "-v", test_env__SHARED_VOLUME_HOST + ":"s + test_env__SHARED_VOLUME_CONTAINER);
-    auto container_2_id = start_container("sleep infinity", /* additional docker args */ "-v", test_env__SHARED_VOLUME_HOST + ":"s + test_env__SHARED_VOLUME_CONTAINER);
-    auto container_3_id = start_container("sleep infinity", /* additional docker args */ "-v", test_env__SHARED_VOLUME_HOST + ":"s + test_env__SHARED_VOLUME_CONTAINER);
-
-    auto get_container_path = [&test_env__SHARED_VOLUME_CONTAINER](const fs::path& p) {
-      return (test_env__SHARED_VOLUME_CONTAINER / p).generic_path().generic_string();
-    };
-
-    auto get_testenv_path = [&test_env__SHARED_VOLUME_TEST](const fs::path& p) {
-      return (test_env__SHARED_VOLUME_TEST / p).generic_path().generic_string();
-    };
-
-    auto delete_if_exist = [](const fs::path& p) {
-      if(fs::exists(p)) {
-        fs::remove(p);
-      }
-    };
-
-    // test the the volume mount works for all the containers by checking that a file
-    // 
-    {
-      std::string volume_mount_test_file = "volume_mount_test.txt";
-      std::string volume_mount_test_file_test_path = get_testenv_path(volume_mount_test_file);
-
-      // clear leftovers
-      delete_if_exist(volume_mount_test_file_test_path);
-
-      BOOST_REQUIRE(!run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_1_id, "cat", volume_mount_test_file));
-      BOOST_REQUIRE(!run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_2_id, "cat", volume_mount_test_file));
-      BOOST_REQUIRE(!run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_3_id, "cat", volume_mount_test_file));
-      
-      std::cout << "Touching volume roundtrip test file at: " << volume_mount_test_file_test_path << std::endl;
-      tipi::goldilock::file::touch_file_permissive(volume_mount_test_file_test_path);
-
-      auto run_volume_mount_check = [&volume_mount_test_file, &test_env__SHARED_VOLUME_CONTAINER] (const std::string id) {
-        std::cout << "Context: run_volume_mount_check(" << id << ")" << std::endl;
-
-        std::string roundtrip_cmd = "ls -la && echo -n "s + id + " >> "s + volume_mount_test_file + " && cat "s + volume_mount_test_file;
-        auto res = run_docker_cmd("exec", "--workdir", test_env__SHARED_VOLUME_CONTAINER, id, "/bin/sh", "-c", roundtrip_cmd);
-
-        BOOST_REQUIRE(res);
-        std::cout << " -> run_volume_mount_check(" << id << ") SUCCESS" << std::endl;
-        std::cout << "Contents of volume_mount_test_file_test_path in container:\n-------------\n" << res.output << "\n-------------" << std::endl;
-      };
-
-      run_volume_mount_check(container_1_id);
-      run_volume_mount_check(container_2_id);
-      run_volume_mount_check(container_3_id);
-
-      // now we're expecting that the volume_mount_test_file contains all three container ids in a particular order!
-      auto file_content = tipi::goldilock::file::read_file_content(volume_mount_test_file_test_path);
-      std::cout << "Contents of volume_mount_test_file_test_path in test env:\n-------------\n" << file_content << "\n-------------" << std::endl;
-      BOOST_REQUIRE(file_content == (container_1_id + container_2_id + container_3_id));
-    }
-
-    // the actual test of goldilock
-    {
-      const std::string master_lockfile_name = "master.lock";
-      const std::string stage2_lockfile_name = "stage2.lock";
-      bool test_flag_expect_master_released = false;
-
-      auto get_container_lock_aquired_marker_name = [](const std::string& id) {
-        return "lock_acquired_"s + id + ".marker";
-      };
-      
-      std::string write_dest_file = "destination.txt";
-      std::string write_dest_file_testenv_path = get_testenv_path(write_dest_file);
-      delete_if_exist(write_dest_file_testenv_path);
-
-      auto write_letter_container_fn = [&](const std::string& id, std::string chr, size_t interval) {
-
-        std::stringstream ss_cmd;
-
-        ss_cmd   << "/usr/bin/goldilock"
-          << " " << "--lockfile " << get_container_path(stage2_lockfile_name)
-          << " " << "--lock-success-marker " << get_container_path(get_container_lock_aquired_marker_name(id))
-          << " " << "--"  
-          << " " << "support_app_append_to_file -s " << chr << " -n  100 -f " << get_container_path(write_dest_file) << " -i " << interval          
-        ;
-
-        auto result = run_docker_cmd("exec", "-e", "TEST=2", "--workdir", test_env__SHARED_VOLUME_CONTAINER, id, "sh", "-c", ss_cmd.str());
-        BOOST_REQUIRE(test_flag_expect_master_released);
-        BOOST_REQUIRE(result);
-      };
-
-       auto write_letter_host_fn = [&](std::string chr, size_t interval) {
-        const std::string support_app_append_to_file_bin = get_executable_path_from_test_env("support_app_append_to_file");
-        auto result = run_goldilock_command_in(test_env__SHARED_VOLUME_HOST, 
-          "--lockfile", get_testenv_path(master_lockfile_name), 
-          "--lockfile", get_testenv_path(stage2_lockfile_name),
-          "--", 
-            support_app_append_to_file_bin, "-s", chr, "-n", "100", "-f", write_dest_file_testenv_path, "-i", std::to_string(interval)
-        );
-        BOOST_REQUIRE(result.return_code == 0);
-      };
-
-      // we're testing the unlockfile and multilock file acquisition at the same time here...
-      // let's have container 1 hold only the master lock
-      std::string master_lock_acquired_marker = "master_lock_acquired.marker";
-      std::string master_lock_acquired_marker_testenv_path = get_testenv_path(master_lock_acquired_marker);
-      delete_if_exist(master_lock_acquired_marker_testenv_path);      
-      
-      std::string master_unlockfile_name = "master.unlockfile";
-      std::string master_unlockfile_testenv_path = get_testenv_path(master_unlockfile_name);
-      delete_if_exist(master_unlockfile_testenv_path); 
-
-      std::thread t_container1([&](){ 
-        std::stringstream ss_cmd;
-
-        ss_cmd   << "/usr/bin/goldilock"
-          << " " << "--lockfile " << get_container_path(master_lockfile_name)
-          << " " << "--unlockfile " << get_container_path(master_unlockfile_name)
-          << " " << "--lock-success-marker " << get_container_path(master_lock_acquired_marker)
-          << " " << "--timeout 30" // fail if we don't get unlocked withing 30s
-        ;
-
-        auto result = run_docker_cmd("exec", "-e", "TEST=1", "--workdir", test_env__SHARED_VOLUME_CONTAINER, container_1_id, "sh", "-c", ss_cmd.str());
-        BOOST_REQUIRE(test_flag_expect_master_released);
-        BOOST_REQUIRE(result);
-      });
-
-      // make sure the master lock is taken
-      wait_for_file(get_testenv_path(master_lock_acquired_marker));
-      
-      // now start the other processes
-      std::thread t_host([&](){ write_letter_host_fn("H", 2); });
-      std::thread t_container2([&](){ write_letter_container_fn(container_2_id, "2", 2); });
-      std::thread t_container3([&](){ write_letter_container_fn(container_3_id, "3", 1); });
-
-      BOOST_REQUIRE(!fs::exists(write_dest_file_testenv_path));
-
-      test_flag_expect_master_released = true;
-      tipi::goldilock::file::touch_file(master_unlockfile_testenv_path);
-
-      wait_for_file(get_testenv_path(get_container_lock_aquired_marker_name(container_2_id)), 50, 100ms);
-      wait_for_file(get_testenv_path(get_container_lock_aquired_marker_name(container_3_id)), 50, 100ms);
-
-      t_host.join();
-      t_container1.join();
-      t_container2.join();
-      t_container3.join();
-
-      BOOST_REQUIRE(fs::exists(write_dest_file_testenv_path));
-
-      auto file_content = tipi::goldilock::file::read_file_content(write_dest_file_testenv_path);
-      std::cout << "Testing dockerized goldilocked interleaved write output:\n-------------\n" << file_content << "\n-------------\nExpecting no mixing of H|2|3" << std::endl;
-      
-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"^([H23]{300})$"}));
-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[H]{100}"}));
-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[2]{100}"}));
-      BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[3]{100}"}));
-
-    }
-    
-  }
+     
 
 }

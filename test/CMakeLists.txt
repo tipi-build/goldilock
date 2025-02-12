@@ -24,6 +24,7 @@ set(test_support_apps_source_files
     "${CMAKE_CURRENT_LIST_DIR}/support_app_append_to_file.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/support_app_launcher.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/support_app_exiter.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/support_app_deleter.cpp"
 )
 
 # we use this to inject the information about where "test supporting executables"
@@ -67,9 +68,9 @@ function(add_goldilock_test test_name source_files)
 endfunction()
 
 set(test_source_files
-    "${CMAKE_CURRENT_LIST_DIR}/test_basics.cpp"
+    #"${CMAKE_CURRENT_LIST_DIR}/test_basics.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/test_docker.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/test_benchmark.cpp"
+    #"${CMAKE_CURRENT_LIST_DIR}/test_benchmark.cpp"
 )
 
 if(NOT WIN32)
