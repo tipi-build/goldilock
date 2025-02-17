@@ -75,15 +75,12 @@ namespace tipi::goldilock
     goldilock_cli_options()
       : options_{"goldilock", "goldilock - flexible file based locking and process barrier for the win"}
     {
-      // we need that as string 
-      std::string timeout_default = std::to_string(goldilock::constants::CLI_DEFAULT_TIMEOUT_SECONDS);
-
       options_.add_options()
         ("v,verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
         ("h,help", "Print usage")
         ("l,lockfile", "Lockfile(s) to acquire / release, specify as many as you want", cxxopts::value<std::vector<std::string>>())
         ("unlockfile", "Instead of running a command, have goldilock wait for all the specified unlock files to exist (those files will be deleted on exit)", cxxopts::value<std::vector<std::string>>())
-        ("timeout", "In the case of --unlockfile, specify a timeout that should not be exceeded (in seconds, default to "s + timeout_default + ")"s, cxxopts::value<size_t>()->default_value(timeout_default))
+        ("timeout", "In the case of --unlockfile, specify a timeout that should not be exceeded (integer value in seconds)"s, cxxopts::value<size_t>()->default_value(std::to_string(goldilock::constants::CLI_DEFAULT_TIMEOUT_SECONDS)))
         ("no-timeout", "Do not timeout when using --unlockfile")
         ("detach", "Launch a detached copy with the same parameters otherwise")
         ("lock-success-marker", "A marker file to write when all logs got acquired", cxxopts::value<std::vector<std::string>>())
