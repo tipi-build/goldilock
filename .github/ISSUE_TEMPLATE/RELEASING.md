@@ -13,6 +13,7 @@ The goldilock development and release process follow the typical [git-flow](http
 To perform a new release, the following is required :
 
 - [ ] Merge fixes and features for the release in `develop`
+- [ ] Create a commit in `develop` that increments based on semver [`version_in_development`](https://github.com/tipi-build/goldilock/blob/main/.github/workflows/ci.yaml#L9)
 - [ ] Create a pull-request from the [`develop` branch targetting the `main` branch](https://github.com/tipi-build/goldilock/compare/main...develop)
 - [ ] The PR ci.yaml will Create [a draft release](https://github.com/tipi-build/goldilock/releases)
   - [ ] Check that all CI platform builds and tests properly
