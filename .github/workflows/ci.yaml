@@ -1,9 +1,5 @@
 name: build
 on:
-  push:
-    branches:
-      - main
-      - develop
   pull_request:
 env:
   version_in_development: v1.2.0
