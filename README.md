@@ -58,22 +58,23 @@ Usage:
 Building
 --------
 
-Build using `tipi` (substitute the toolchain your platform of choice e.g. `windows-cxx17` or `vs-16-2019-win64-cxx17` etc...)
+By using the provided `cmake` build system:
 
 ```shell
-tipi . -t linux-cxx17
-```
-
-... or by using the provided `cmake` build system:
-
-```shell
-mkdir -p build/linux
-cmake -S . -B build/linux -GNinja -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-cxx17.cmake
+cmake -S . -B build/linux -GNinja -DBUILD_TESTING=ON
 cmake --build build/linux
 ```
 
+Developing the project
+--------
+If you plan to develop the project and contribute to it, you will need to enable `-DBUILD_TESTING=ON`.
+
+```shell
+cmake -S . -B build/linux -GNinja -DBUILD_TESTING=ON
+cmake --build build/linux
+```
 
 License
 -------
 
-`goldilock` is available under a proprietary license or subject to GPLv2 licence as per your choice. Please contact [tipi technologies Ltd.](https://tipi.build/) for commercial options.
+`goldilock` is available under a proprietary license or subject to GPLv2 licence as per your choice. Please contact [tipi technologies Ltd.](https://tipi.build/) for more details.
