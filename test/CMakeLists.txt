@@ -24,6 +24,7 @@ set(test_support_apps_source_files
     "${CMAKE_CURRENT_LIST_DIR}/support_app_append_to_file.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/support_app_launcher.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/support_app_exiter.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/support_app_deleter.cpp"
 )
 
 # we use this to inject the information about where "test supporting executables"

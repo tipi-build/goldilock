@@ -89,6 +89,7 @@ namespace goldilock::test {
     std::cout << "Buiding docker container " << context_root << " (target tag: '" << image_tag << "')" << std::endl;
     docker_build_prep_copy_executable("goldilock", context_root);
     docker_build_prep_copy_executable("support_app_append_to_file", context_root);
+    docker_build_prep_copy_executable("support_app_deleter", context_root);
 
     std::vector<std::string> docker_build_cmd_args = { "build", "--tag", image_tag, "." };
 
@@ -296,7 +297,7 @@ namespace goldilock::test {
         BOOST_REQUIRE(result);
       };
 
-       auto write_letter_host_fn = [&](std::string chr, size_t interval) {
+      auto write_letter_host_fn = [&](std::string chr, size_t interval) {
         const std::string support_app_append_to_file_bin = get_executable_path_from_test_env("support_app_append_to_file");
         auto result = run_goldilock_command_in(test_env__SHARED_VOLUME_HOST, 
           "--lockfile", get_testenv_path(master_lockfile_name), 
@@ -364,7 +365,39 @@ namespace goldilock::test {
       BOOST_REQUIRE(boost::regex_search(file_content, boost::regex{"[3]{100}"}));
 
     }
-    
   }
+
+  // note on this test case
+  // running many goldilock instances trying to aqcquire the same lock
+  // using GUN parallel 
+  //
+  // this test used to trigger a race in goldilock <=1.20 that was the 
+  // result of either one of the two following issues
+  // - trying to read lockspots that were already deleted by the goldilock that owned it
+  // - trying to set permission on a file that some other goldilock deemed to be a broken lockspot and had already deleted it since
+  BOOST_FIXTURE_TEST_CASE(goldilock_high_concurrency, docker_case_fixture) {
+    auto id = start_container();
+
+    // run support_app_deleter in the "background" for 10s to have all the lock spots deleted as they are created
+    // the "-f mylock." has the support app delete all files starting with "mylock." - those are the lockspot files
+    auto deleter_result =  run_docker_cmd("exec", "-w", "/tmp", "--detach", id, "/bin/sh", "-c", "support_app_deleter -f mylock. -d 10 -t 8");
+    BOOST_REQUIRE(deleter_result.return_code == 0); 
+
+    std::this_thread::sleep_for(1s); // give the deleter a chance to be up and running...
+
+    // note --halt-on-error now,fail,1 == "Kill off all jobs immediately and exit without cleanup. The exit status will be the exit status from the failing job."
+    // note however that we will parse the std output of the application here to detect parallel complaining about job failures because it doesn't invent 
+    // a non-zero return code for cases like these where the app might fail (or has previously failed) with a segfault 
+    auto result = run_docker_cmd("exec", "-w", "/tmp", id, "/bin/sh", "-c", "seq 60 | parallel --halt-on-error now,fail,1 -j50 /usr/bin/goldilock --lockfile mylock -- echo job no"); 
+    std::cout << ".......START goldilock run output from container.......\n"
+      << result.output
+      << "\n.......END goldilock run output from container.......\n" 
+      << "Return code: " << result.return_code
+      << std::endl;
+
+    BOOST_REQUIRE(result.return_code == 0);
+    BOOST_REQUIRE(!boost::regex_search(result.output, boost::regex{"This job failed"}));
+  }
+     
 
 }

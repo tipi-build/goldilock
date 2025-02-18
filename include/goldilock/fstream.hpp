@@ -31,7 +31,11 @@ namespace tipi::goldilock::exclusive_fstream
     std::fstream stream;
 
     if (excl) {
-      fs::permissions(filename, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write);
+      // fail silently here, who knows what the conditions are - we might crash later if we can't actually
+      // write, but we should not fail because if we can RW it's enough for us      
+      boost::system::error_code ec;
+      fs::permissions(filename, fs::add_perms|fs::owner_write|fs::group_write|fs::others_write, ec);
+      
       stream.open(filename);
     }
     else {

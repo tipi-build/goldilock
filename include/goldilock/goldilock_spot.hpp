@@ -113,6 +113,9 @@ namespace tipi::goldilock {
         timestamp_ = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
 
         fs::path spot_path = get_spot_path();
+        if(fs::exists(spot_path)) {          
+          continue; // someone else took our candidate spot - retry
+        }
 
         {
           auto lockfile_stream = exclusive_fstream::open(spot_path, "w");
@@ -122,12 +125,16 @@ namespace tipi::goldilock {
 
             lockfile_stream.close();
           }
+          else {
+            // we failed to open, shortcut & got and retry once more
+            continue;
+          }
         }
 
         // now read and see if the contents are as expected
         {
           auto read_back = goldilock_spot::try_read_from(spot_path, lockfile_);
-          got_spot = (read_back.has_value() && read_back->get_guid() == get_guid() && read_back->get_timestamp() ==  get_timestamp());
+          got_spot = (read_back.has_value() && read_back->get_guid() == get_guid() && read_back->get_timestamp() == get_timestamp());
         }
 
         if(got_spot) {
@@ -277,7 +284,7 @@ namespace tipi::goldilock {
   //!\brief list all lockfiles given a lockfile path "waiting in line" and clear expired ones
   inline std::map<fs::path, goldilock_spot> list_lockfile_spots(const fs::path& lockfile_path) {
     std::map<fs::path, goldilock_spot> result;
-    fs::path parent_path = fs::weakly_canonical(fs::path(lockfile_path)).parent_path();     
+    fs::path parent_path = fs::weakly_canonical(fs::path(lockfile_path)).parent_path();
 
     for(auto & directory_entry : boost::filesystem::directory_iterator(parent_path)) {
 
@@ -292,13 +299,20 @@ namespace tipi::goldilock {
 
         bool delete_spot = false;
         bool read_success = false;
+        bool skip = false; // is cases where the lockspot gets deleted while we're enumerating / reading we skip
 
         size_t read_retries = 0;
-        const size_t max_read_retries = 50;
+        const size_t max_read_retries = 20;
 
         while(!read_success && read_retries++ < max_read_retries) {
 
           try {
+            // skip if this lockspot was deleted while we were doing something else
+            if(!fs::exists(directory_entry.path())) {
+              skip = true;
+              continue;
+            }
+
             auto spot = goldilock_spot::read_from(directory_entry.path(), lockfile_path);
             read_success = true;
             delete_spot = spot.is_expired();
@@ -309,15 +323,20 @@ namespace tipi::goldilock {
           }
           catch(...) {
             // this is not totally unexpected... we have a couple of retries to make sure we don't fail on transient states
+            std::this_thread::sleep_for(10ms);
           }
         }    
+
+        if(skip) {
+          continue;
+        }
 
         if(!read_success && read_retries >= max_read_retries) {
           delete_spot = true;
           std::cerr << "Warning - deleting broken lock spot:" << directory_entry.path() << std::endl;
         }
 
-        if(delete_spot) {
+        if(delete_spot && fs::exists(directory_entry.path())) {
           boost::system::error_code fsec;
           fs::remove(directory_entry.path(), fsec); // fail silently... 
         }
