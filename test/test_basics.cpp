@@ -9,6 +9,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/process.hpp>
+#include <boost/asio.hpp>
 #include <boost/asio/detail/signal_init.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -24,6 +25,7 @@
 
 #include <goldilock/file.hpp>
 #include <goldilock/process_info.hpp>
+#include <goldilock/goldilock_constants.hpp>
 
  
 namespace goldilock::test { 
@@ -464,5 +466,218 @@ namespace goldilock::test {
     tipi::goldilock::file::touch_file(path_watchfile_daemonized);
     BOOST_REQUIRE(test_launcher_exited(path_pidfile_daemonized));  
 
+  }
+
+  BOOST_AUTO_TEST_CASE(goldilock_unlockfile_timeout_test) {
+
+    //
+    //std::chrono::steady_clock::time_point test_overall_expiry = test_start + 70s;
+
+    boost::asio::io_context io;
+    bool test_expired = false;
+    bool test_finished = false;
+    std::optional<bool> default_timeout_test_success = std::nullopt;
+    std::optional<bool> custom_timeout_test_success = std::nullopt;
+    std::optional<bool> no_timeout_test_success = std::nullopt;
+    
+    //
+    // check if the test went through and cancel the io_context if necessary
+    boost::asio::steady_timer test_finished_timer(io);
+    std::function<void(const boost::system::error_code&)> test_finished_tick_fn;
+    test_finished_tick_fn = [&](const boost::system::error_code& ec) {
+      if(ec == boost::asio::error::operation_aborted) {
+        return;
+      }
+
+      if(default_timeout_test_success.has_value() && custom_timeout_test_success.has_value() && no_timeout_test_success.has_value()) {
+        test_finished = true;
+        io.stop();
+        return;
+      }
+
+      test_finished_timer.expires_after(100ms);
+      test_finished_timer.async_wait(test_finished_tick_fn);
+      
+    };
+
+    test_finished_timer.async_wait(test_finished_tick_fn);
+
+
+    //
+    // cancel and fail the test after a 90s timeout / that's about 30s more that it should take in the worst case
+    boost::asio::steady_timer test_expiry_timer(io);
+    test_expiry_timer.expires_after(90s);
+    test_expiry_timer.async_wait([&](auto& ec) {
+      if(ec == boost::asio::error::operation_aborted) {
+        // success the timer was properly aborted
+      }
+      else {
+        test_expired = true;
+        io.stop();
+      }
+    }); 
+
+
+    // let's launch a couple of tests concurrently to save on time...
+    std::vector<bp::child> child_processes;
+
+    std::chrono::steady_clock::time_point test_start = std::chrono::steady_clock::now();
+
+    //
+    // default timeout test
+    {
+      auto fut_ptr = std::make_shared<std::future<std::string>>();
+      auto wd = get_goldilock_case_working_dir();
+      fs::create_directories(wd);
+
+      child_processes.emplace_back(
+        host_goldilock_executable_path(), "--lockfile", "mylock_1", "--unlockfile", "unlockfile",
+          io, bp::start_dir=wd, (bp::std_out & bp::std_err) > *fut_ptr, bp::std_in < bp::null,
+          bp::on_exit=[&](int exit_code, std::error_code const& ec) {
+            std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+            auto test_run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - test_start);
+
+            std::cout << "Default timeout test returned with code: " << exit_code << " (after " << test_run_duration.count() << "ms)" << std::endl;
+
+          
+            if(ec) {
+              std::cout << "Error code = " << ec.message() << std::endl;
+              std::cout << "----- STDOUT -----\n" << fut_ptr->get() << "\n---- END STDOUT -----" << std::endl;
+              default_timeout_test_success = false;
+            }
+            else {
+
+              auto default_timeout = tipi::goldilock::constants::CLI_DEFAULT_TIMEOUT_SECONDS * 1000ms;
+              auto lower_bound = default_timeout - 500ms;
+              auto upper_bound = default_timeout + 500ms;
+
+              std::cout << " + default timeout = " << default_timeout.count() << "ms" << std::endl;
+              std::cout << " + lower bound = " << lower_bound.count() << "ms" << std::endl;
+              std::cout << " + upper bound = " << upper_bound.count() << "ms" << std::endl;
+
+              // we wanted to time out and the default timeout is 60s - we appy a 1s margin of safety
+              default_timeout_test_success = exit_code == 1 && test_run_duration >= lower_bound && test_run_duration <= upper_bound;
+              std::cout << " -> Default timeout test success: " << std::to_string(default_timeout_test_success.value()) << std::endl;
+            }
+          }        
+      );
+    }
+
+
+    //  
+    // custom timeout test
+    {
+      auto fut_ptr = std::make_shared<std::future<std::string>>();
+      auto wd = get_goldilock_case_working_dir();
+      size_t test_timeout_seconds = 5;
+      fs::create_directories(wd);
+
+      child_processes.emplace_back(
+        host_goldilock_executable_path(), "--lockfile", "mylock_1", "--unlockfile", "unlockfile", "--timeout", std::to_string(test_timeout_seconds),
+          io, bp::start_dir=wd, (bp::std_out & bp::std_err) > *fut_ptr, bp::std_in < bp::null,
+          bp::on_exit=[&, test_timeout_seconds=test_timeout_seconds](int exit_code, std::error_code const& ec) {
+            std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+            auto test_run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - test_start);
+
+            std::cout << "Custom timeout test returned with code: " << exit_code << " (after " << test_run_duration.count() << "ms)" << std::endl;
+            
+            if(ec) {
+              std::cout << "Error code = " << ec.message() << std::endl;
+              std::cout << "----- STDOUT -----\n" << fut_ptr->get() << "\n---- END STDOUT -----" << std::endl;
+              default_timeout_test_success = false;
+            }
+            else {
+              auto expected_timeout = test_timeout_seconds * 1000ms;
+              auto lower_bound = expected_timeout - 500ms;
+              auto upper_bound = expected_timeout + 500ms;
+              
+              std::cout << " + expected timeout = " << expected_timeout.count() << "ms" << std::endl;
+              std::cout << " + lower bound = " << lower_bound.count() << "ms" << std::endl;
+              std::cout << " + upper bound = " << upper_bound.count() << "ms" << std::endl;
+
+              // we wanted to time out and the chosen timeout is 5s - we appy a 1s margin of safety
+              custom_timeout_test_success = exit_code == 1 && test_run_duration >= lower_bound && test_run_duration <= upper_bound;
+              std::cout << " -> Custom timeout test success: " << std::to_string(custom_timeout_test_success.value()) << std::endl;
+            }
+          }        
+      );
+    }
+
+
+    //
+    // no-timeout test
+    boost::asio::steady_timer no_timeout_test_expiry_timer(io);
+    bool no_timeout_test_unlockfile_written = false;
+
+    {
+      auto fut_ptr = std::make_shared<std::future<std::string>>();
+      auto wd = get_goldilock_case_working_dir();
+      fs::create_directories(wd);
+      auto unlock_file = wd / "unlockfile";
+
+      // external expiry = default timeout + 5s
+      auto expiry_seconds = tipi::goldilock::constants::CLI_DEFAULT_TIMEOUT_SECONDS * 1000ms + 5000ms; 
+
+      BOOST_REQUIRE(!fs::exists(unlock_file));
+
+      child_processes.emplace_back(
+        host_goldilock_executable_path(), "--lockfile", "mylock_1", "--unlockfile", unlock_file.generic_string(), "--no-timeout",
+          io, bp::start_dir=wd, (bp::std_out & bp::std_err) > *fut_ptr, bp::std_in < bp::null,
+          bp::on_exit=[&, unlock_file=unlock_file, expiry_seconds=expiry_seconds](int exit_code, std::error_code const& ec) {
+            std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+            auto test_run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - test_start);
+
+            std::cout << "No-timeout test returned with code: " << exit_code << " (after " << test_run_duration.count() << "ms)" << std::endl;
+            
+            if(ec) {
+              std::cout << "Error code = " << ec.message() << std::endl;
+              std::cout << "----- STDOUT -----\n" << fut_ptr->get() << "\n---- END STDOUT -----" << std::endl;
+              default_timeout_test_success = false;
+            }
+            else {
+
+              auto lower_bound = expiry_seconds - 500ms;
+              auto upper_bound = expiry_seconds + 500ms;
+
+              std::cout << " + expected expiry = " << expiry_seconds.count() << "ms" << std::endl;
+              std::cout << " + lower bound = " << lower_bound.count() << "ms" << std::endl;
+              std::cout << " + upper bound = " << upper_bound.count() << "ms" << std::endl;
+
+              // we wanted to time out and the chosen timeout is 65s - we appy a 1s margin of safety
+              no_timeout_test_success = no_timeout_test_unlockfile_written && exit_code == 0 && test_run_duration >= lower_bound && test_run_duration <= upper_bound;
+              std::cout << " -> No timeout test success: " << std::to_string(no_timeout_test_success.value()) << std::endl;
+            }
+          }        
+      );
+
+      // we write the unlock file after 65s
+      no_timeout_test_expiry_timer.expires_after(expiry_seconds);
+      no_timeout_test_expiry_timer.async_wait([&, unlock_file=unlock_file](auto& ec) {
+        if(ec == boost::asio::error::operation_aborted) {
+          BOOST_FAIL("Timer was aborted...");
+        }
+        else {
+          std::cout << "Default timeout would be expired by now - unlocking for no timeout test now" << std::endl;
+          std::cout << " -> writing " << unlock_file << std::endl;
+          BOOST_REQUIRE(!fs::exists(unlock_file));
+          no_timeout_test_unlockfile_written = true;
+          tipi::goldilock::file::touch_file(unlock_file);          
+        }
+      }); 
+
+    }
+
+    io.run();
+
+    BOOST_REQUIRE(test_finished);
+    BOOST_REQUIRE(!test_expired);
+
+    BOOST_REQUIRE(default_timeout_test_success.has_value());
+    BOOST_REQUIRE(custom_timeout_test_success.has_value());
+    BOOST_REQUIRE(no_timeout_test_success.has_value());
+
+    BOOST_REQUIRE(default_timeout_test_success == true);
+    BOOST_REQUIRE(custom_timeout_test_success == true);
+    BOOST_REQUIRE(no_timeout_test_success == true);
   }
 }
