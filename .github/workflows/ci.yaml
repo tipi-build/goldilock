@@ -11,8 +11,8 @@ jobs:
     name: Draft Release if develop branch
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.draft_release.outputs.upload_url }}  
-      release_id: ${{ steps.draft_release.outputs.id }}  
+      upload_url: ${{ steps.draft_release.outputs.upload_url }}
+      release_id: ${{ steps.draft_release.outputs.id }}
     steps:
       - name: Create Release
         id: draft_release
@@ -21,32 +21,32 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          owner: tipi-build 
+          owner: tipi-build
           repo: goldilock
           commitish: ${{ github.event.pull_request.head.sha }}
           tag_name: ${{ env.version_in_development }}
           release_name: ${{ env.version_in_development }} ${{ github.event.pull_request.head.sha }}
           draft: true
-          prerelease: true 
+          prerelease: true
 
   build-macos:
     name: build-macos
     runs-on: macos-latest
-    permissions:  
+    permissions:
       contents: write
     needs: draft-release
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: install and build 
+      - name: install and build
         run: |
           cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
           cmake --build build/macos
           cd build/macos/ && cpack -G ZIP
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
-        id: upload-tipi-goldilock-package 
+        id: upload-tipi-goldilock-package
         uses: actions/upload-release-asset@v1
         env:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,7 +57,7 @@ jobs:
           asset_content_type: application/zip
       - name: Run tests
         run: |
-          cd build/macos/ 
+          cd build/macos/
           ctest --verbose -E test_docker
 
   build-macos-intel:
@@ -70,15 +70,15 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: install and build 
+      - name: install and build
         run: |
           cmake -S . -B build/macos -DCMAKE_TOOLCHAIN_FILE=environments/macos-clang-cxx17.cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
           cmake --build build/macos
-          cd build/macos/ 
+          cd build/macos/
           cpack -G ZIP
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
-        id: upload-tipi-goldilock-package 
+        id: upload-tipi-goldilock-package
         uses: actions/upload-release-asset@v1
         env:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -90,61 +90,65 @@ jobs:
       - name: Run tests
         run: |
 
-          cd build/macos/ 
+          cd build/macos/
           ctest --verbose -E test_docker
 
   build-linux:
-    name: build-linux
-    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+    name: build-linux-${{ matrix.os }}
     permissions:
       contents: write
-    container: 
-      image: tipibuild/tipi-ubuntu:latest
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-      # --init makes sure the container has an init process running as as the PID 1 in the container. Specifying an init process ensures the usual responsibilities of an init system, such as reaping zombie processes, are performed inside the created container.
-      options: --init
     needs: draft-release
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+
       - name: setup
         run: |
+          # we need ninja
           sudo apt update
-          sudo apt-get install -y docker.io           
-
-          # the buildx plugin is available under either one of these names
-          set +e
-          sudo apt-get install -y docker-buildx 
-          sudo apt-get install -y docker-buildx-plugin
-          set -e
+          sudo apt-get install -y ninja-build
 
           sudo docker --version
           sudo docker buildx version
-          
-      - name: install and build 
+
+      - name: install and build
         run: |
-          tipi run cmake -S . -B build/linux -GNinja -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-cxx17-static.cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
-          tipi run cmake --build build/linux
+          cmake -S . -B build/linux -GNinja -DCMAKE_TOOLCHAIN_FILE=environments/linux-clang-14-cxx17-static.cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/linux
           cd build/linux/
-          tipi run cpack -G ZIP
+
+          # this tests that the binary is statically linked and fails if it isn't
+          file src/goldilock | grep -q 'statically linked'
+
+          cpack -G ZIP
+
+      - name: determine build architecture for packaging
+        run: |
+          echo "BUILD_ARCHITECTURE=$(uname -i)" >> $GITHUB_ENV
 
       - name: Upload goldilock package
         if: ${{needs.draft-release.outputs.upload_url}}
-        id: upload-tipi-goldilock-package 
+        id: upload-tipi-goldilock-package
         uses: actions/upload-release-asset@v1
         env:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{needs.draft-release.outputs.upload_url}}
           asset_path: ./build/linux/goldilock.zip
-          asset_name: goldilock-linux.zip
+          asset_name: goldilock-linux-${{ env.BUILD_ARCHITECTURE }}.zip
           asset_content_type: application/zip
+
       - name: Run tests
         run: |
-          cd build/linux/ 
-          tipi run ctest --verbose -E test_docker
+          cd build/linux/
+          ctest --verbose -E test_docker
+
       - name: Run docker tests
         run: |
 
@@ -153,12 +157,12 @@ jobs:
           export SHARE_VOLUME_FOLDER=_dind_shared_volume
           export GOLDILOCK_TEST_DIND_SHARED_VOLUME_CONTAINER=${{ github.workspace }}/$SHARE_VOLUME_FOLDER
           export GOLDILOCK_TEST_DIND_SHARED_VOLUME_HOST=${{ github.workspace }}/$SHARE_VOLUME_FOLDER
-          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST=$(pwd)/$SHARE_VOLUME_FOLDER          
-          
-          # create the folder from the test environmnent's perspective: 
+          export GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST=$(pwd)/$SHARE_VOLUME_FOLDER
+
+          # create the folder from the test environmnent's perspective:
           mkdir -p $GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST
           echo "hello" > $GOLDILOCK_TEST_DIND_SHARED_VOLUME_TEST/test_from_ci_yaml
 
           cd build/linux/
           # ... we need priviledge to write to the docker socket
-          sudo --preserve-env tipi run ctest --verbose -R test_docker
+          sudo --preserve-env ctest --verbose -R test_docker
